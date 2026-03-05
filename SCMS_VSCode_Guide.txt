@@ -1,0 +1,1306 @@
+SMART CAMPUS MANAGEMENT SYSTEM
+
+Complete VS Code Development Guide
+
+College of Engineering Trivandrum | PECST411
+
+Team Members: Abhijith S Unni (02) | Jacob Biju (35) | Arjun Sathyam
+(74) | Rajesh Krishna (76)
+
+Academic Year: 2025-2026
+
+1. Project Overview & Goal
+
+This document is your complete VS Code development blueprint for the
+Smart Campus Management System (SCMS). Follow each section in order. By
+the end, you will have a fully scaffolded, running application with
+backend APIs, a React frontend, and a connected PostgreSQL database.
+
+Tech Stack Summary
+
+  ------------------------------------------------------------------------
+  Layer           Technology             Purpose
+  --------------- ---------------------- ---------------------------------
+  Backend         Java 17 + Spring Boot  REST API microservices
+                  3.x                    
+
+  Frontend        React.js + Material-UI Web dashboard & student portal
+                  (MUI)                  
+
+  Mobile          React Native           iOS & Android apps
+
+  Database        PostgreSQL 15          Structured data (users, courses)
+  (Primary)                              
+
+  Cache           Redis 7                Session tokens, attendance cache
+
+  Auth            JWT + OAuth 2.0        Stateless secure sessions
+
+  Cloud           AWS / Azure            Deployment & file storage
+
+  Analytics       Apache Spark +         Predictive student analytics
+                  TensorFlow             
+  ------------------------------------------------------------------------
+
+2. Complete File & Folder Structure
+
+Create this exact structure in VS Code. The root folder is scms/.
+
+2.1 Root Layout
+
+  scms/
+
+  ├── backend/ # Spring Boot monorepo
+
+  │ ├── api-gateway/
+
+  │ ├── user-service/
+
+  │ ├── academic-service/
+
+  │ ├── lms-service/
+
+  │ ├── financial-service/
+
+  │ ├── notification-service/
+
+  │ └── analytics-service/
+
+  ├── frontend/ # React.js web app
+
+  │ ├── public/
+
+  │ └── src/
+
+  │ ├── components/
+
+  │ ├── pages/
+
+  │ ├── services/
+
+  │ ├── context/
+
+  │ ├── hooks/
+
+  │ └── utils/
+
+  ├── mobile/ # React Native
+
+  ├── database/ # SQL scripts
+
+  │ ├── migrations/
+
+  │ └── seeds/
+
+  ├── docker-compose.yml
+
+  ├── .env.example
+
+  └── README.md
+
+2.2 Backend Service Structure (each service follows this pattern)
+
+  user-service/
+
+  ├── src/main/java/com/scms/userservice/
+
+  │ ├── UserServiceApplication.java
+
+  │ ├── config/
+
+  │ │ ├── SecurityConfig.java
+
+  │ │ └── JwtConfig.java
+
+  │ ├── controller/
+
+  │ │ └── UserController.java
+
+  │ ├── service/
+
+  │ │ ├── UserService.java
+
+  │ │ └── UserServiceImpl.java
+
+  │ ├── repository/
+
+  │ │ └── UserRepository.java
+
+  │ ├── model/
+
+  │ │ ├── User.java
+
+  │ │ ├── Student.java
+
+  │ │ └── Faculty.java
+
+  │ ├── dto/
+
+  │ │ ├── LoginRequest.java
+
+  │ │ ├── LoginResponse.java
+
+  │ │ └── UserDTO.java
+
+  │ └── exception/
+
+  │ └── GlobalExceptionHandler.java
+
+  ├── src/main/resources/
+
+  │ └── application.yml
+
+  └── pom.xml
+
+2.3 Frontend Structure
+
+  src/
+
+  ├── App.jsx
+
+  ├── main.jsx
+
+  ├── components/
+
+  │ ├── layout/
+
+  │ │ ├── Navbar.jsx
+
+  │ │ ├── Sidebar.jsx
+
+  │ │ └── Footer.jsx
+
+  │ ├── common/
+
+  │ │ ├── LoadingSpinner.jsx
+
+  │ │ ├── ProtectedRoute.jsx
+
+  │ │ └── ErrorBoundary.jsx
+
+  │ └── dashboard/
+
+  │ ├── StudentDashboard.jsx
+
+  │ ├── FacultyDashboard.jsx
+
+  │ └── AdminDashboard.jsx
+
+  ├── pages/
+
+  │ ├── auth/ Login.jsx, Register.jsx
+
+  │ ├── courses/ CourseList.jsx, CourseDetail.jsx
+
+  │ ├── attendance/ AttendanceView.jsx, MarkAttendance.jsx
+
+  │ ├── assignments/ AssignmentList.jsx, SubmitAssignment.jsx
+
+  │ ├── fees/ FeePayment.jsx, PaymentHistory.jsx
+
+  │ └── admin/ ManageUsers.jsx, Reports.jsx
+
+  ├── services/
+
+  │ ├── api.js # Axios base config
+
+  │ ├── authService.js
+
+  │ ├── courseService.js
+
+  │ └── userService.js
+
+  └── context/
+
+  └── AuthContext.jsx
+
+3. VS Code Setup: Step-by-Step Commands
+
+Open VS Code terminal (Ctrl+`) and run these commands in order.
+
+Step 1 — Prerequisites (install once)
+
+Install these before starting:
+
+-   Java 17 JDK: https://adoptium.net
+
+-   Node.js 20 LTS: https://nodejs.org
+
+-   Maven 3.9+: https://maven.apache.org
+
+-   Docker Desktop: https://www.docker.com/products/docker-desktop
+
+-   PostgreSQL 15: https://www.postgresql.org/download
+
+-   VS Code extensions: Extension Pack for Java, Spring Boot Extension
+    Pack, ESLint, Prettier
+
+Step 2 — Create root project folder
+
+  mkdir scms && cd scms
+
+  git init
+
+  touch .gitignore README.md docker-compose.yml .env.example
+
+Step 3 — Create Spring Boot backend services
+
+Use Spring Initializr for EACH service. Go to: https://start.spring.io
+and set:
+
+-   Project: Maven | Language: Java | Spring Boot: 3.2.x
+
+-   Java: 17 | Packaging: Jar
+
+Create 7 services with these names and dependencies:
+
+  -----------------------------------------------------------------------
+  Service Name       Artifact ID            Dependencies to Select
+  ------------------ ---------------------- -----------------------------
+  API Gateway        api-gateway            Gateway, Eureka Discovery
+                                            Client, Config Client
+
+  User Service       user-service           Web, JPA, PostgreSQL,
+                                            Security, Lombok, Validation
+
+  Academic Service   academic-service       Web, JPA, PostgreSQL,
+                                            Security, Lombok
+
+  LMS Service        lms-service            Web, JPA, PostgreSQL,
+                                            Security, Lombok
+
+  Financial Service  financial-service      Web, JPA, PostgreSQL,
+                                            Security, Lombok
+
+  Notification       notification-service   Web, Mail, Lombok
+  Service                                   
+
+  Analytics Service  analytics-service      Web, JPA, PostgreSQL, Lombok
+  -----------------------------------------------------------------------
+
+After downloading each, place them in: scms/backend/<service-name>/
+
+Step 4 — Create React Frontend
+
+  cd scms
+
+  npm create vite@latest frontend -- --template react
+
+  cd frontend
+
+  npm install
+
+  npm install @mui/material @emotion/react @emotion/styled
+
+  npm install @mui/icons-material
+
+  npm install react-router-dom axios react-query
+
+  npm install @mui/x-data-grid @mui/x-date-pickers
+
+  npm install recharts
+
+  npm install react-hook-form @hookform/resolvers yup
+
+Step 5 — Database setup
+
+  # Start PostgreSQL and create databases
+
+  psql -U postgres
+
+  CREATE DATABASE scms_users;
+
+  CREATE DATABASE scms_academic;
+
+  CREATE DATABASE scms_financial;
+
+  CREATE USER scms_admin WITH PASSWORD 'scms_pass_2025';
+
+  GRANT ALL PRIVILEGES ON DATABASE scms_users TO scms_admin;
+
+  GRANT ALL PRIVILEGES ON DATABASE scms_academic TO scms_admin;
+
+  GRANT ALL PRIVILEGES ON DATABASE scms_financial TO scms_admin;
+
+  \q
+
+Step 6 — Start everything with Docker
+
+  cd scms
+
+  docker-compose up -d
+
+4. Key Configuration Files
+
+Create each of these files at the specified paths. Copy the content
+exactly.
+
+4.1 docker-compose.yml (root: scms/docker-compose.yml)
+
+  version: '3.8'
+
+  services:
+
+  postgres:
+
+  image: postgres:15
+
+  environment:
+
+  POSTGRES_PASSWORD: scms_pass_2025
+
+  ports: ['5432:5432']
+
+  volumes: ['postgres_data:/var/lib/postgresql/data']
+
+  redis:
+
+  image: redis:7-alpine
+
+  ports: ['6379:6379']
+
+  pgadmin:
+
+  image: dpage/pgadmin4
+
+  environment:
+
+  PGADMIN_DEFAULT_EMAIL: admin@scms.edu
+
+  PGADMIN_DEFAULT_PASSWORD: admin
+
+  ports: ['5050:80']
+
+  volumes:
+
+  postgres_data:
+
+4.2 User Service application.yml
+
+Path: backend/user-service/src/main/resources/application.yml
+
+  server:
+
+  port: 8081
+
+  spring:
+
+  application:
+
+  name: user-service
+
+  datasource:
+
+  url: jdbc:postgresql://localhost:5432/scms_users
+
+  username: scms_admin
+
+  password: scms_pass_2025
+
+  jpa:
+
+  hibernate:
+
+  ddl-auto: update
+
+  show-sql: true
+
+  jwt:
+
+  secret: scms_super_secret_jwt_key_2025_college
+
+  expiration: 86400000 # 24 hours in ms
+
+4.3 Frontend .env
+
+Path: frontend/.env
+
+  VITE_API_BASE_URL=http://localhost:8080
+
+  VITE_USER_SERVICE_URL=http://localhost:8081
+
+  VITE_ACADEMIC_SERVICE_URL=http://localhost:8082
+
+  VITE_FINANCIAL_SERVICE_URL=http://localhost:8083
+
+  VITE_APP_NAME=Smart Campus Management System
+
+4.4 Frontend src/services/api.js
+
+  import axios from 'axios';
+
+  const api = axios.create({
+
+  baseURL: import.meta.env.VITE_API_BASE_URL,
+
+  headers: { 'Content-Type': 'application/json' }
+
+  });
+
+  api.interceptors.request.use(config => {
+
+  const token = localStorage.getItem('scms_token');
+
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+
+  return config;
+
+  });
+
+  api.interceptors.response.use(
+
+  response => response,
+
+  error => {
+
+  if (error.response?.status === 401) {
+
+  localStorage.removeItem('scms_token');
+
+  window.location.href = '/login';
+
+  }
+
+  return Promise.reject(error);
+
+  }
+
+  );
+
+  export default api;
+
+5. Database Creation SQL Scripts
+
+Run these in order. Save as database/migrations/V1__init.sql
+
+5.1 Users & Roles
+
+  CREATE TABLE users (
+
+  user_id SERIAL PRIMARY KEY,
+
+  email VARCHAR(100) UNIQUE NOT NULL,
+
+  password_hash VARCHAR(255) NOT NULL,
+
+  first_name VARCHAR(50) NOT NULL,
+
+  last_name VARCHAR(50) NOT NULL,
+
+  phone_number VARCHAR(15) UNIQUE,
+
+  date_of_birth DATE NOT NULL,
+
+  gender VARCHAR(10) NOT NULL,
+
+  address TEXT,
+
+  user_type VARCHAR(20) NOT NULL CHECK (user_type IN
+  ('STUDENT','FACULTY','ADMIN','PARENT')),
+
+  is_active BOOLEAN DEFAULT TRUE,
+
+  created_at TIMESTAMP DEFAULT NOW(),
+
+  updated_at TIMESTAMP DEFAULT NOW()
+
+  );
+
+5.2 Students Table
+
+  CREATE TABLE students (
+
+  student_id INT PRIMARY KEY REFERENCES users(user_id),
+
+  enrollment_no VARCHAR(20) UNIQUE NOT NULL,
+
+  program VARCHAR(100) NOT NULL,
+
+  department VARCHAR(100) NOT NULL,
+
+  enrollment_year INT NOT NULL,
+
+  current_sem INT NOT NULL,
+
+  cgpa DECIMAL(3,2) DEFAULT 0.00,
+
+  parent_id INT REFERENCES users(user_id)
+
+  );
+
+5.3 Faculty Table
+
+  CREATE TABLE faculty (
+
+  faculty_id INT PRIMARY KEY REFERENCES users(user_id),
+
+  employee_id VARCHAR(20) UNIQUE NOT NULL,
+
+  department VARCHAR(100) NOT NULL,
+
+  designation VARCHAR(50) NOT NULL,
+
+  specialization VARCHAR(100),
+
+  joining_date DATE NOT NULL
+
+  );
+
+5.4 Courses & Enrollments
+
+  CREATE TABLE courses (
+
+  course_id SERIAL PRIMARY KEY,
+
+  course_code VARCHAR(20) UNIQUE NOT NULL,
+
+  course_name VARCHAR(100) NOT NULL,
+
+  department VARCHAR(100) NOT NULL,
+
+  credits INT NOT NULL,
+
+  semester INT NOT NULL,
+
+  max_capacity INT NOT NULL DEFAULT 60,
+
+  description TEXT,
+
+  is_active BOOLEAN DEFAULT TRUE
+
+  );
+
+  CREATE TABLE enrollments (
+
+  enrollment_id SERIAL PRIMARY KEY,
+
+  student_id INT REFERENCES students(student_id),
+
+  course_id INT REFERENCES courses(course_id),
+
+  enrollment_date TIMESTAMP DEFAULT NOW(),
+
+  status VARCHAR(20) DEFAULT 'ACTIVE',
+
+  grade VARCHAR(2),
+
+  marks DECIMAL(5,2),
+
+  UNIQUE(student_id, course_id)
+
+  );
+
+5.5 Attendance, Assignments, Payments
+
+  CREATE TABLE attendance (
+
+  attendance_id SERIAL PRIMARY KEY,
+
+  student_id INT REFERENCES students(student_id),
+
+  course_id INT REFERENCES courses(course_id),
+
+  date DATE NOT NULL,
+
+  status VARCHAR(10) NOT NULL CHECK (status IN
+  ('PRESENT','ABSENT','LATE')),
+
+  marked_by INT REFERENCES faculty(faculty_id),
+
+  marked_at TIMESTAMP DEFAULT NOW()
+
+  );
+
+  CREATE TABLE assignments (
+
+  assignment_id SERIAL PRIMARY KEY,
+
+  course_id INT REFERENCES courses(course_id),
+
+  title VARCHAR(200) NOT NULL,
+
+  description TEXT,
+
+  due_date TIMESTAMP NOT NULL,
+
+  max_marks INT NOT NULL,
+
+  created_by INT REFERENCES faculty(faculty_id),
+
+  created_at TIMESTAMP DEFAULT NOW()
+
+  );
+
+  CREATE TABLE submissions (
+
+  submission_id SERIAL PRIMARY KEY,
+
+  assignment_id INT REFERENCES assignments(assignment_id),
+
+  student_id INT REFERENCES students(student_id),
+
+  file_path VARCHAR(255) NOT NULL,
+
+  submission_date TIMESTAMP DEFAULT NOW(),
+
+  marks_obtained DECIMAL(5,2),
+
+  feedback TEXT,
+
+  graded_by INT REFERENCES faculty(faculty_id),
+
+  graded_at TIMESTAMP
+
+  );
+
+  CREATE TABLE payments (
+
+  payment_id SERIAL PRIMARY KEY,
+
+  student_id INT REFERENCES students(student_id),
+
+  amount DECIMAL(10,2) NOT NULL,
+
+  payment_date TIMESTAMP DEFAULT NOW(),
+
+  payment_method VARCHAR(20) NOT NULL,
+
+  transaction_id VARCHAR(100),
+
+  status VARCHAR(20) DEFAULT 'PENDING',
+
+  receipt_url VARCHAR(255)
+
+  );
+
+6. Core Java Backend Code
+
+These are the essential files to create first. Each file path is
+relative to user-service/src/main/java/com/scms/userservice/
+
+6.1 User Entity — model/User.java
+
+  @Entity @Table(name = 'users')
+
+  @Data @NoArgsConstructor @AllArgsConstructor
+
+  public class User {
+
+  @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+  private Long userId;
+
+  @Column(unique = true, nullable = false)
+
+  private String email;
+
+  @Column(nullable = false)
+
+  private String passwordHash;
+
+  private String firstName, lastName, phoneNumber, address;
+
+  private LocalDate dateOfBirth;
+
+  @Enumerated(EnumType.STRING)
+
+  private UserType userType; // STUDENT, FACULTY, ADMIN, PARENT
+
+  private Boolean isActive = true;
+
+  private LocalDateTime createdAt = LocalDateTime.now();
+
+  }
+
+6.2 UserRepository — repository/UserRepository.java
+
+  @Repository
+
+  public interface UserRepository extends JpaRepository<User, Long> {
+
+  Optional<User> findByEmail(String email);
+
+  List<User> findByUserType(UserType userType);
+
+  boolean existsByEmail(String email);
+
+  }
+
+6.3 JWT Utility — config/JwtUtil.java
+
+  @Component
+
+  public class JwtUtil {
+
+  @Value('${jwt.secret}') private String secret;
+
+  @Value('${jwt.expiration}') private long expiration;
+
+  public String generateToken(UserDetails userDetails) {
+
+  return Jwts.builder()
+
+  .setSubject(userDetails.getUsername())
+
+  .setIssuedAt(new Date())
+
+  .setExpiration(new Date(System.currentTimeMillis() + expiration))
+
+  .signWith(SignatureAlgorithm.HS512, secret)
+
+  .compact();
+
+  }
+
+  public String extractEmail(String token) {
+
+  return Jwts.parser().setSigningKey(secret)
+
+  .parseClaimsJws(token).getBody().getSubject();
+
+  }
+
+  }
+
+6.4 Auth Controller — controller/AuthController.java
+
+  @RestController @RequestMapping('/api/auth')
+
+  @CrossOrigin(origins = '*')
+
+  public class AuthController {
+
+  @Autowired private AuthService authService;
+
+  @PostMapping('/login')
+
+  public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest
+  req) {
+
+  return ResponseEntity.ok(authService.login(req));
+
+  }
+
+  @PostMapping('/register')
+
+  public ResponseEntity<UserDTO> register(@RequestBody RegisterRequest
+  req) {
+
+  return ResponseEntity.status(HttpStatus.CREATED)
+
+  .body(authService.register(req));
+
+  }
+
+  }
+
+6.5 Security Config — config/SecurityConfig.java
+
+  @Configuration @EnableWebSecurity
+
+  public class SecurityConfig {
+
+  @Bean
+
+  public SecurityFilterChain filterChain(HttpSecurity http) throws
+  Exception {
+
+  http.csrf().disable()
+
+  .authorizeHttpRequests()
+
+  .requestMatchers('/api/auth/**').permitAll()
+
+  .requestMatchers('/api/admin/**').hasRole('ADMIN')
+
+  .requestMatchers('/api/faculty/**').hasAnyRole('ADMIN','FACULTY')
+
+  .anyRequest().authenticated()
+
+  .and().sessionManagement()
+
+  .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+
+  .and().addFilterBefore(jwtFilter, UsernamePasswordAuthFilter.class);
+
+  return http.build();
+
+  }
+
+  }
+
+7. Core React Frontend Code
+
+7.1 src/context/AuthContext.jsx
+
+  import { createContext, useContext, useState, useEffect } from
+  'react';
+
+  import api from '../services/api';
+
+  const AuthContext = createContext(null);
+
+  export function AuthProvider({ children }) {
+
+  const [user, setUser] = useState(null);
+
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+
+  const token = localStorage.getItem('scms_token');
+
+  if (token) { /* decode and set user */ }
+
+  setLoading(false);
+
+  }, []);
+
+  const login = async (email, password) => {
+
+  const { data } = await api.post('/api/auth/login', { email, password
+  });
+
+  localStorage.setItem('scms_token', data.token);
+
+  setUser(data.user);
+
+  return data.user;
+
+  };
+
+  const logout = () => {
+
+  localStorage.removeItem('scms_token');
+
+  setUser(null);
+
+  };
+
+  return (
+
+  <AuthContext.Provider value={{ user, login, logout, loading }}>
+
+  {children}
+
+  </AuthContext.Provider>
+
+  );
+
+  }
+
+  export const useAuth = () => useContext(AuthContext);
+
+7.2 src/App.jsx
+
+  import { BrowserRouter, Routes, Route, Navigate } from
+  'react-router-dom';
+
+  import { AuthProvider, useAuth } from './context/AuthContext';
+
+  import Login from './pages/auth/Login';
+
+  import StudentDashboard from
+  './components/dashboard/StudentDashboard';
+
+  import FacultyDashboard from
+  './components/dashboard/FacultyDashboard';
+
+  import AdminDashboard from './components/dashboard/AdminDashboard';
+
+  function RoleRouter() {
+
+  const { user } = useAuth();
+
+  if (!user) return <Navigate to='/login' />;
+
+  if (user.role === 'STUDENT') return <StudentDashboard />;
+
+  if (user.role === 'FACULTY') return <FacultyDashboard />;
+
+  if (user.role === 'ADMIN') return <AdminDashboard />;
+
+  }
+
+  export default function App() {
+
+  return (
+
+  <AuthProvider>
+
+  <BrowserRouter>
+
+  <Routes>
+
+  <Route path='/login' element={<Login />} />
+
+  <Route path='/dashboard' element={<RoleRouter />} />
+
+  <Route path='*' element={<Navigate to='/login' />} />
+
+  </Routes>
+
+  </BrowserRouter>
+
+  </AuthProvider>
+
+  );
+
+  }
+
+7.3 src/pages/auth/Login.jsx
+
+  import { useState } from 'react';
+
+  import { useNavigate } from 'react-router-dom';
+
+  import { TextField, Button, Box, Typography, Paper } from
+  '@mui/material';
+
+  import { useAuth } from '../../context/AuthContext';
+
+  export default function Login() {
+
+  const [email, setEmail] = useState('');
+
+  const [password, setPassword] = useState('');
+
+  const [error, setError] = useState('');
+
+  const { login } = useAuth();
+
+  const navigate = useNavigate();
+
+  const handleLogin = async () => {
+
+  try {
+
+  const user = await login(email, password);
+
+  navigate('/dashboard');
+
+  } catch (e) {
+
+  setError('Invalid email or password');
+
+  }
+
+  };
+
+  return (
+
+  <Box sx={{ display:'flex', justifyContent:'center', mt: 10 }}>
+
+  <Paper sx={{ p: 4, width: 400 }}>
+
+  <Typography variant='h5'>SCMS Login</Typography>
+
+  <TextField label='Email' fullWidth margin='normal'
+
+  value={email} onChange={e => setEmail(e.target.value)} />
+
+  <TextField label='Password' type='password' fullWidth margin='normal'
+
+  value={password} onChange={e => setPassword(e.target.value)} />
+
+  {error && <Typography color='error'>{error}</Typography>}
+
+  <Button variant='contained' fullWidth sx={{ mt: 2 }}
+
+  onClick={handleLogin}>Login</Button>
+
+  </Paper>
+
+  </Box>
+
+  );
+
+  }
+
+8. Complete API Endpoints Reference
+
+8.1 User Service (Port 8081)
+
+  ------------------------------------------------------------------------------
+  Method     Endpoint                       Auth          Description
+  ---------- ------------------------------ ------------- ----------------------
+  POST       /api/auth/login                None          Login, returns JWT
+
+  POST       /api/auth/register             None          Register new user
+
+  GET        /api/users/me                  JWT           Get current user
+                                                          profile
+
+  PUT        /api/users/me                  JWT           Update profile
+
+  GET        /api/admin/users               ADMIN         List all users
+
+  PUT        /api/admin/users/{id}/toggle   ADMIN         Activate/deactivate
+  ------------------------------------------------------------------------------
+
+8.2 Academic Service (Port 8082)
+
+  -----------------------------------------------------------------------------
+  Method     Endpoint                      Auth          Description
+  ---------- ----------------------------- ------------- ----------------------
+  GET        /api/courses                  JWT           List available courses
+
+  POST       /api/courses                  ADMIN         Create new course
+
+  POST       /api/enrollments              STUDENT       Enroll in a course
+
+  DELETE     /api/enrollments/{id}         STUDENT       Drop a course
+
+  POST       /api/attendance               FACULTY       Mark attendance
+
+  GET        /api/attendance/{studentId}   JWT           View attendance
+
+  GET        /api/timetable                JWT           Get student timetable
+  -----------------------------------------------------------------------------
+
+8.3 LMS Service (Port 8083)
+
+  -----------------------------------------------------------------------------
+  Method     Endpoint                      Auth          Description
+  ---------- ----------------------------- ------------- ----------------------
+  GET        /api/assignments/{courseId}   JWT           List assignments
+
+  POST       /api/assignments              FACULTY       Create assignment
+
+  POST       /api/submissions              STUDENT       Submit assignment
+
+  PUT        /api/submissions/{id}/grade   FACULTY       Grade submission
+
+  GET        /api/grades/{studentId}       JWT           View grades
+  -----------------------------------------------------------------------------
+
+8.4 Financial Service (Port 8084)
+
+  ------------------------------------------------------------------------
+  Method     Endpoint                 Auth          Description
+  ---------- ------------------------ ------------- ----------------------
+  GET        /api/fees/{studentId}    JWT           View fee summary
+
+  POST       /api/payments/initiate   STUDENT       Start payment
+
+  POST       /api/payments/callback   None          Gateway webhook
+
+  GET        /api/payments/history    JWT           Payment history
+  ------------------------------------------------------------------------
+
+9. Running the Full Project
+
+9.1 Start Backend Services
+
+Open 7 terminal tabs in VS Code (Ctrl+Shift+5 to split). Run one per
+tab:
+
+  # Tab 1 - Start Docker containers
+
+  cd scms && docker-compose up -d
+
+  # Tab 2 - User Service
+
+  cd scms/backend/user-service
+
+  mvn spring-boot:run
+
+  # Tab 3 - Academic Service
+
+  cd scms/backend/academic-service
+
+  mvn spring-boot:run
+
+  # Tab 4 - LMS Service
+
+  cd scms/backend/lms-service
+
+  mvn spring-boot:run
+
+  # Tab 5 - Financial Service
+
+  cd scms/backend/financial-service
+
+  mvn spring-boot:run
+
+  # Tab 6 - Frontend
+
+  cd scms/frontend
+
+  npm run dev
+
+Frontend runs at: http://localhost:5173
+
+pgAdmin (DB browser) runs at: http://localhost:5050
+
+9.2 Verify Everything Is Working
+
+Test the login API using this curl command:
+
+  curl -X POST http://localhost:8081/api/auth/login \
+
+  -H 'Content-Type: application/json' \
+
+  -d '{"email": "admin@scms.edu", "password": "admin123"}'
+
+You should get back a JSON response with a token field. If you get a 200
+OK, the backend is working.
+
+9.3 VS Code Extensions to Install
+
+  -----------------------------------------------------------------------
+  Extension                  Why You Need It
+  -------------------------- --------------------------------------------
+  Extension Pack for Java    Spring Boot support, Maven integration
+
+  Spring Boot Extension Pack Run/debug Spring apps from VS Code
+
+  ES7+ React Snippets        Fast React component creation
+
+  Prettier - Code Formatter  Auto-format JS/Java code
+
+  Thunder Client             Test REST APIs without Postman
+
+  GitLens                    Git blame, history, and review
+
+  Docker                     Manage containers from VS Code
+
+  PostgreSQL (by Chris       View DB tables directly in VS Code
+  Kolkman)                   
+  -----------------------------------------------------------------------
+
+10. Development Timeline (12 Weeks)
+
+  ------------------------------------------------------------------------
+  Phase       Weeks              What to Build              Owner
+  ----------- ------------------ -------------------------- --------------
+  Phase 1     Week 1-2           Docker setup, DB schema,   Abhijith
+                                 User auth (JWT             
+                                 login/register)            
+
+  Phase 2     Week 3-5           Course management,         Abhijith
+                                 Enrollment, Attendance,    
+                                 Timetable                  
+
+  Phase 3     Week 6-7           Assignments, Submissions,  Arjun
+                                 Grading, File upload       
+
+  Phase 4     Week 8-9           Fee payment, Razorpay      Rajesh
+                                 integration, Hostel,       
+                                 Library                    
+
+  Phase 5     Week 10-11         Notifications, Analytics   Rajesh + Arjun
+                                 dashboard, Reports         
+
+  Phase 6     Week 12            Testing (JUnit + Jest),    All
+                                 Security scan, Deployment  
+  ------------------------------------------------------------------------
+
+Team Responsibilities
+
+  -----------------------------------------------------------------------
+  Member             Responsibilities
+  ------------------ ----------------------------------------------------
+  Abhijith S Unni    Backend: User & Academic services, DB design, JWT
+  (02)               auth
+
+  Jacob Biju (35)    Frontend: React.js UI, MUI components, React Native
+                     mobile app
+
+  Arjun Sathyam (74) Backend: LMS & Communication services, File uploads,
+                     Integrations
+
+  Rajesh Krishna     Backend: Financial & Analytics, DevOps, CI/CD, AWS
+  (76)               deployment
+  -----------------------------------------------------------------------
+
+11. Copy-Paste VS Code AI Prompt
+
+Use this prompt in VS Code's Copilot Chat or any AI coding assistant to
+generate code for any module:
+
+═══ MASTER PROMPT — Copy this entire block ═══
+
+  I am building the Smart Campus Management System (SCMS) for College of
+  Engineering Trivandrum. This is a Java Spring Boot + React.js +
+  PostgreSQL project.
+
+  Stack: Spring Boot 3.2, Java 17, PostgreSQL 15, React.js + MUI, JWT
+  auth, REST APIs.
+
+  Users: Student, Faculty, Admin, Parent. RBAC with JWT tokens.
+
+  NOW GENERATE: [Describe the specific module you want, e.g. 'the
+  complete CourseController.java with CRUD, enrollments, and capacity
+  check, plus the React CourseList.jsx page']
+
+Replace the [Describe the specific module] part with one of these for
+each feature:
+
+-   Login page + JWT auth filter backend
+
+-   Course registration flow (backend + frontend)
+
+-   Attendance marking by faculty with bulk update
+
+-   Assignment submission with file upload to S3
+
+-   Fee payment integration with Razorpay
+
+-   Analytics dashboard with charts (Recharts)
+
+-   Admin user management table with MUI DataGrid
+
+-   Student performance report export as PDF
+
+12. Quick Reference Cheatsheet
+
+Port Map
+
+  ------------------------------------------------------------------------
+  Service                Port            URL
+  ---------------------- --------------- ---------------------------------
+  React Frontend         5173            http://localhost:5173
+
+  API Gateway            8080            http://localhost:8080
+
+  User Service           8081            http://localhost:8081
+
+  Academic Service       8082            http://localhost:8082
+
+  LMS Service            8083            http://localhost:8083
+
+  Financial Service      8084            http://localhost:8084
+
+  Notification Service   8085            http://localhost:8085
+
+  PostgreSQL             5432            localhost:5432
+
+  Redis                  6379            localhost:6379
+
+  pgAdmin                5050            http://localhost:5050
+  ------------------------------------------------------------------------
+
+Common Maven Commands
+
+  mvn spring-boot:run # Start service
+
+  mvn test # Run all unit tests
+
+  mvn package -DskipTests # Build JAR without tests
+
+  mvn dependency:tree # View all dependencies
+
+Common npm Commands
+
+  npm run dev # Start development server
+
+  npm run build # Build for production
+
+  npm test # Run Jest tests
+
+  npm run lint # Check for code errors
+
+Good luck with the project! Build Phase 1 first (auth), get it working,
+then move to Phase 2. Do not skip to analytics before the core modules
+work.

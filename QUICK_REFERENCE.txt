@@ -1,0 +1,105 @@
+╔══════════════════════════════════════════════════════════════════╗
+║           SCMS - QUICK REFERENCE CARD                             ║
+║     Smart Campus Management System - Ready to Demo!               ║
+╚══════════════════════════════════════════════════════════════════╝
+
+🚀 START THE APPLICATION
+═══════════════════════════════════════════════════════════════════
+
+Option 1 - Automatic (Recommended):
+    cd c:\Users\abhij\scms
+    .\start-all.ps1
+
+Option 2 - Manual:
+    # Terminal 1: docker-compose up -d
+    # Terminal 2: cd backend\user-service; mvn spring-boot:run
+    # Terminal 3: cd frontend; npm run dev
+
+🌐 ACCESS URLs
+═══════════════════════════════════════════════════════════════════
+    Frontend:  http://localhost:5173
+    Backend:   http://localhost:8081
+    pgAdmin:   http://localhost:5050
+
+🔑 LOGIN CREDENTIALS
+═══════════════════════════════════════════════════════════════════
+    Student:  student1@scms.edu  / password123
+    Faculty:  faculty1@scms.edu  / password123
+    Admin:    admin@scms.edu     / password123
+
+✨ FEATURES TO DEMO
+═══════════════════════════════════════════════════════════════════
+    ✅ JWT Authentication & Role-based Access
+    ✅ Student Dashboard (3 Enrolled Courses)
+    ✅ Attendance Tracking (70% in DS, 85% in DBMS)
+    ✅ Assignment List & Submission (File Upload)
+    ✅ Faculty Attendance Marking (Bulk Update)
+    ✅ Faculty Assignment Management
+
+🧪 TEST FLOW
+═══════════════════════════════════════════════════════════════════
+    1. Login as student1@scms.edu
+    2. View Dashboard → See 3 courses
+    3. Click "View Attendance" → See 70% attendance
+    4. Click "Assignments" → See 2 pending assignments
+    5. Click "Submit" → Upload file → Success!
+    
+    6. Logout → Login as faculty1@scms.edu
+    7. Click "Attendance" tab → Mark Attendance
+    8. Select students → Mark Present/Absent → Submit
+
+📊 SAMPLE DATA LOADED
+═══════════════════════════════════════════════════════════════════
+    • 4 Users (1 Admin, 1 Faculty, 2 Students)
+    • 3 Courses (Data Structures, DBMS, OS)
+    • 6 Enrollments (both students in all 3 courses)
+    • 20+ Attendance Records
+    • 5 Assignments
+    • 1 Graded Submission
+
+🛑 STOP EVERYTHING
+═══════════════════════════════════════════════════════════════════
+    Ctrl+C in all terminals
+    docker-compose down
+
+🐛 TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════
+    Backend Error:
+        → Check: docker ps (PostgreSQL running?)
+        → Check: java -version (Java 17?)
+        → Check: Port 8081 free?
+    
+    Frontend Error:
+        → Run: npm install
+        → Check: Backend running on 8081?
+        → Check: .env file exists?
+    
+    Login Failed:
+        → Check backend logs
+        → Verify database seeded:
+          docker exec -it scms-postgres-1 psql -U postgres 
+            -d scms_users -c "SELECT * FROM users;"
+
+📁 KEY FILES
+═══════════════════════════════════════════════════════════════════
+    start-all.ps1              → Auto-start everything
+    IMPLEMENTATION_SUMMARY.md  → Complete feature list
+    QUICK_START_GUIDE.md       → Detailed setup guide
+    MANUAL_START.md            → Step-by-step instructions
+
+📞 SUPPORT
+═══════════════════════════════════════════════════════════════════
+    Read:  IMPLEMENTATION_SUMMARY.md
+    Check: Backend/Frontend terminal logs
+    View:  http://localhost:5050 (pgAdmin for DB)
+
+═══════════════════════════════════════════════════════════════════
+Project Status: ✅ COMPLETE & READY TO DEMO
+Total Files: 44 Backend + 13 Frontend + 8 Config = 65 files
+Total Code: ~5,000+ lines
+Time to Demo: 5 minutes (after running start-all.ps1)
+═══════════════════════════════════════════════════════════════════
+
+College of Engineering Trivandrum | PECST411 | 2025-2026
+Team: Abhijith S Unni (02), Jacob Biju (35), 
+      Arjun Sathyam (74), Rajesh Krishna (76)

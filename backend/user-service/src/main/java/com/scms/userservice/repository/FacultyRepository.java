@@ -1,0 +1,12 @@
+package com.scms.userservice.repository;
+
+import com.scms.userservice.model.Faculty;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import java.util.Optional;
+
+@Repository
+public interface FacultyRepository extends JpaRepository<Faculty, Long> {
+    Optional<Faculty> findByEmployeeId(String employeeId);
+    boolean existsByEmployeeId(String employeeId);
+}

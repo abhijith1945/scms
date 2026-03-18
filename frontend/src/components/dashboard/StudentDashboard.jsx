@@ -9,7 +9,8 @@ import {
   Button,
   AppBar,
   Toolbar,
-  IconButton
+  IconButton,
+  Alert
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -24,6 +25,7 @@ export default function StudentDashboard() {
   const [attendanceData, setAttendanceData] = useState({});
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -33,17 +35,23 @@ export default function StudentDashboard() {
 
   const fetchDashboardData = async () => {
     try {
+      setError('');
       const [coursesData, attendanceData, assignmentsData] = await Promise.all([
         courseService.getEnrolledCourses(),
         attendanceService.getMyAttendance(),
         assignmentService.getMyAssignments()
       ]);
       
-      setCourses(coursesData);
-      setAttendanceData(attendanceData);
-      setAssignments(assignmentsData);
+      console.log('Courses:', coursesData);
+      console.log('Attendance:', attendanceData);
+      console.log('Assignments:', assignmentsData);
+      
+      setCourses(coursesData || []);
+      setAttendanceData(attendanceData || {});
+      setAssignments(assignmentsData || []);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      setError('Failed to load dashboard data: ' + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
@@ -77,43 +85,74 @@ export default function StudentDashboard() {
           Welcome, {user?.firstName}!
         </Typography>
 
+        <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={() => navigate('/student/enrollments')}
+          >
+            Browse & Enroll Courses
+          </Button>
+          <Button 
+            variant="outlined" 
+            color="primary"
+            onClick={fetchDashboardData}
+          >
+            Refresh
+          </Button>
+        </Box>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
         {/* Courses Section */}
         <Typography variant="h5" sx={{ mt: 4, mb: 2 }}>
           My Courses
         </Typography>
         <Grid container spacing={3}>
-          {courses.map((course) => (
-            <Grid item xs={12} md={6} key={course.courseId}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6">{course.courseName}</Typography>
-                  <Typography color="text.secondary">
-                    {course.courseCode} | {course.credits} Credits
-                  </Typography>
-                  <Typography variant="body2" sx={{ mt: 1 }}>
-                    Department: {course.department}
-                  </Typography>
-                  <Box sx={{ mt: 2 }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      sx={{ mr: 1 }}
-                      onClick={() => navigate(`/attendance?courseId=${course.courseId}`)}
-                    >
-                      View Attendance
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => navigate(`/assignments?courseId=${course.courseId}`)}
-                    >
-                      Assignments
-                    </Button>
-                  </Box>
-                </CardContent>
-              </Card>
+          {courses.length > 0 ? (
+            courses.map((course) => (
+              <Grid item xs={12} md={6} key={course.courseId}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6">{course.courseName}</Typography>
+                    <Typography color="text.secondary">
+                      {course.courseCode} | {course.credits} Credits
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      Department: {course.department}
+                    </Typography>
+                    <Box sx={{ mt: 2 }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        sx={{ mr: 1 }}
+                        onClick={() => navigate(`/attendance?courseId=${course.courseId}`)}
+                      >
+                        View Attendance
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => navigate(`/assignments?courseId=${course.courseId}`)}
+                      >
+                        Assignments
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))
+          ) : (
+            <Grid item xs={12}>
+              <Alert severity="info">
+                You are not enrolled in any courses yet.
+              </Alert>
             </Grid>
-          ))}
+          )}
         </Grid>
 
         {/* Attendance Overview */}

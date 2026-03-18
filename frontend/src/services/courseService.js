@@ -16,8 +16,21 @@ const courseService = {
     return response.data;
   },
 
-  enrollCourse: async (courseId) => {
-    const response = await api.post(`/api/courses/${courseId}/enroll`);
+  // Create new course (Faculty/Admin only)
+  createCourse: async (courseData) => {
+    const response = await api.post('/api/courses', courseData);
+    return response.data;
+  },
+
+  // Update course (Faculty/Admin only)
+  updateCourse: async (id, courseData) => {
+    const response = await api.put(`/api/courses/${id}`, courseData);
+    return response.data;
+  },
+
+  // Delete course (Admin only)
+  deleteCourse: async (id) => {
+    const response = await api.delete(`/api/courses/${id}`);
     return response.data;
   }
 };

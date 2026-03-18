@@ -18,6 +18,10 @@ import {
   Alert,
   TextField
 } from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import attendanceService from '../../services/attendanceService';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -97,14 +101,19 @@ export default function MarkAttendance() {
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <TextField
-            label="Date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            sx={{ mb: 2 }}
-          />
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <DatePicker
+              label="Date"
+              value={date ? dayjs(date) : null}
+              onChange={(newDate) => setDate(newDate ? newDate.format('YYYY-MM-DD') : '')}
+              disableFuture
+              slotProps={{
+                textField: {
+                  sx: { mb: 2 }
+                }
+              }}
+            />
+          </LocalizationProvider>
         </CardContent>
       </Card>
 

@@ -13,20 +13,24 @@ const attendanceService = {
     return response.data;
   },
 
-  markAttendance: async (attendanceData) => {
-    const response = await api.post('/api/attendance/mark', attendanceData);
-    return response.data;
-  },
-
+  // Mark attendance (bulk)
   bulkMarkAttendance: async (attendanceList) => {
     const response = await api.post('/api/attendance/bulk', attendanceList);
     return response.data;
   },
 
-  getAttendancePercentage: async (studentId, courseId) => {
-    const response = await api.get(`/api/attendance/percentage/${studentId}/${courseId}`);
+  // Update attendance (Faculty only)
+  updateAttendance: async (id, status) => {
+    const response = await api.put(`/api/attendance/${id}`, { status });
+    return response.data;
+  },
+
+  // Delete attendance (Faculty only)
+  deleteAttendance: async (id) => {
+    const response = await api.delete(`/api/attendance/${id}`);
     return response.data;
   }
 };
 
 export default attendanceService;
+

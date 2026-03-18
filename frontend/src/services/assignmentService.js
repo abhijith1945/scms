@@ -16,8 +16,21 @@ const assignmentService = {
     return response.data;
   },
 
+  // Create assignment (Faculty only)
   createAssignment: async (assignmentData) => {
     const response = await api.post('/api/assignments', assignmentData);
+    return response.data;
+  },
+
+  // Update assignment (Faculty only)
+  updateAssignment: async (id, assignmentData) => {
+    const response = await api.put(`/api/assignments/${id}`, assignmentData);
+    return response.data;
+  },
+
+  // Delete assignment (Faculty only)
+  deleteAssignment: async (id) => {
+    const response = await api.delete(`/api/assignments/${id}`);
     return response.data;
   },
 
@@ -34,16 +47,24 @@ const assignmentService = {
     return response.data;
   },
 
-  getSubmission: async (assignmentId) => {
-    const response = await api.get(`/api/assignments/${assignmentId}/submission`);
+  // Get submissions for an assignment (Faculty only)
+  getSubmissions: async (assignmentId) => {
+    const response = await api.get(`/api/assignments/${assignmentId}/submissions`);
     return response.data;
   },
 
+  // Grade a submission (Faculty only)
   gradeSubmission: async (submissionId, marksObtained, feedback) => {
-    const response = await api.put(`/api/assignments/submissions/${submissionId}/grade`, {
+    const response = await api.put(`/api/submissions/${submissionId}`, {
       marksObtained,
       feedback
     });
+    return response.data;
+  },
+
+  // Delete submission (Admin only)
+  deleteSubmission: async (submissionId) => {
+    const response = await api.delete(`/api/submissions/${submissionId}`);
     return response.data;
   }
 };

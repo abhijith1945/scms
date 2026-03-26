@@ -149,6 +149,17 @@ const seedDatabase = () => {
     `).run(1, 4, '/uploads/assignments/sample_submission.pdf', 18, 'Excellent implementation. Good handling of edge cases.', 2);
     console.log('✅ Submissions inserted');
 
+    // Insert course_faculty mappings
+    db.prepare('INSERT OR IGNORE INTO course_faculty (course_id, faculty_id) VALUES (?, ?)').run(1, 2);
+    db.prepare('INSERT OR IGNORE INTO course_faculty (course_id, faculty_id) VALUES (?, ?)').run(2, 2);
+    db.prepare('INSERT OR IGNORE INTO course_faculty (course_id, faculty_id) VALUES (?, ?)').run(3, 2);
+    console.log('✅ Course-faculty mappings inserted');
+
+    // Update students with mentor faculty
+    db.prepare('UPDATE students SET mentor_faculty_id = ? WHERE student_id = ?').run(2, 3);
+    db.prepare('UPDATE students SET mentor_faculty_id = ? WHERE student_id = ?').run(2, 4);
+    console.log('✅ Student mentors updated');
+
     console.log('✅ Database seeded successfully!');
   } catch (err) {
     console.error('❌ Error seeding database:', err.message);

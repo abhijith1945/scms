@@ -40,7 +40,7 @@ export default function FacultyDashboard() {
 
   const fetchCourses = async () => {
     try {
-      const data = await courseService.getAllCourses();
+      const data = await courseService.getMyCourses();
       setCourses(data);
     } catch (error) {
       console.error('Error fetching courses:', error);

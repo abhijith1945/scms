@@ -43,7 +43,7 @@ export default function MarkAttendance() {
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -53,7 +53,7 @@ export default function MarkAttendance() {
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      const data = await courseService.getAllCourses();
+      const data = await courseService.getMyCourses();
       setCourses(data);
       if (data.length > 0) {
         setSelectedCourse(data[0].courseId);

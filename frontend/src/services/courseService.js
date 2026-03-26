@@ -32,6 +32,26 @@ const courseService = {
   deleteCourse: async (id) => {
     const response = await api.delete(`/api/courses/${id}`);
     return response.data;
+  },
+
+  getMyCourses: async () => {
+    const response = await api.get('/api/courses/my');
+    return response.data;
+  },
+
+  getCourseFaculty: async (courseId) => {
+    const response = await api.get(`/api/courses/${courseId}/faculty`);
+    return response.data;
+  },
+
+  assignFacultyToCourse: async (courseId, facultyId) => {
+    const response = await api.post(`/api/courses/${courseId}/faculty`, { facultyId });
+    return response.data;
+  },
+
+  removeFacultyFromCourse: async (courseId, facultyId) => {
+    const response = await api.delete(`/api/courses/${courseId}/faculty/${facultyId}`);
+    return response.data;
   }
 };
 

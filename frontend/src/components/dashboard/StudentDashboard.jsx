@@ -85,13 +85,34 @@ export default function StudentDashboard() {
           Welcome, {user?.firstName}!
         </Typography>
 
-        <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
+        <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={() => navigate('/student/my-courses')}
+          >
+            My Courses
+          </Button>
           <Button 
             variant="contained" 
             color="primary"
             onClick={() => navigate('/student/enrollments')}
           >
-            Browse & Enroll Courses
+            Browse &amp; Enroll Courses
+          </Button>
+          <Button 
+            variant="outlined"
+            color="primary"
+            onClick={() => navigate('/attendance')}
+          >
+            My Attendance
+          </Button>
+          <Button 
+            variant="outlined"
+            color="primary"
+            onClick={() => navigate('/assignments')}
+          >
+            My Assignments
           </Button>
           <Button 
             variant="outlined" 

@@ -147,6 +147,18 @@ const initDB = () => {
       );
     `);
 
+    // Course-Faculty many-to-many mapping
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS course_faculty (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        course_id INTEGER NOT NULL,
+        faculty_id INTEGER NOT NULL,
+        UNIQUE(course_id, faculty_id),
+        FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
+        FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+      );
+    `);
+
     console.log('✅ Database schema initialized');
   } catch (err) {
     console.error('❌ Error initializing database:', err.message);
@@ -155,6 +167,11 @@ const initDB = () => {
 
 // Initialize database on first run
 initDB();
+
+// Migration: add mentor_faculty_id to students if not present
+try { db.exec('ALTER TABLE students ADD COLUMN mentor_faculty_id INTEGER REFERENCES faculty(faculty_id)'); } catch(e) {
+  if (!e.message.includes('duplicate column')) console.error('Migration error:', e.message);
+}
 
 module.exports = db;
 

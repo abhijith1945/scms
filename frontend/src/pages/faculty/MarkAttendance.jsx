@@ -43,7 +43,7 @@ export default function MarkAttendance() {
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {

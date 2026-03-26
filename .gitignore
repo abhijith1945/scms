@@ -48,3 +48,6 @@ uploads/
 
 # Environment
 .env
+backend-express/scms.db
+backend-express/.env
+frontend/.env

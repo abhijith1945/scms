@@ -44,7 +44,7 @@ export default function GradeSubmissions() {
   const [openGradeDialog, setOpenGradeDialog] = useState(false);
   const [gradingSubmission, setGradingSubmission] = useState(null);
   const [gradeData, setGradeData] = useState({ marks: '', feedback: '' });
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {

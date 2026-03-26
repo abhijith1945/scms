@@ -6,6 +6,7 @@ const bodyParser = require('body-parser');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
 const db = require('./db');
 require('dotenv').config();
 
@@ -13,10 +14,16 @@ const app = express();
 const PORT = process.env.PORT || 8081;
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// Rate limiting
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
+const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200, standardHeaders: true, legacyHeaders: false });
+
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
 app.use('/uploads', express.static('uploads'));
+app.use('/api/auth', authLimiter);
+app.use('/api', generalLimiter);
 
 // Create uploads directory
 if (!fs.existsSync('uploads/assignments')) {
@@ -891,7 +898,7 @@ app.post('/api/students', authenticateToken, authorize(['ADMIN']), (req, res) =>
 app.put('/api/students/:id', authenticateToken, authorize(['ADMIN']), (req, res) => {
   try {
     const { id } = req.params;
-    const { firstName, lastName, phoneNumber, program, department, enrollmentYear, currentSem, cgpa, mentorFacultyId } = req.body;
+    const { firstName, lastName, phoneNumber, enrollmentNo, program, department, enrollmentYear, currentSem, cgpa, mentorFacultyId } = req.body;
 
     const updateStudentTx = db.transaction(() => {
       db.prepare(`
@@ -900,9 +907,9 @@ app.put('/api/students/:id', authenticateToken, authorize(['ADMIN']), (req, res)
       `).run(firstName, lastName, phoneNumber, id);
 
       db.prepare(`
-        UPDATE students SET program = ?, department = ?, enrollment_year = ?, current_sem = ?, cgpa = ?, mentor_faculty_id = ?
+        UPDATE students SET enrollment_no = ?, program = ?, department = ?, enrollment_year = ?, current_sem = ?, cgpa = ?, mentor_faculty_id = ?
         WHERE student_id = ?
-      `).run(program, department, enrollmentYear, currentSem, cgpa, mentorFacultyId || null, id);
+      `).run(enrollmentNo, program, department, enrollmentYear, currentSem, cgpa, mentorFacultyId || null, id);
     });
 
     updateStudentTx();
@@ -991,7 +998,7 @@ app.post('/api/faculty', authenticateToken, authorize(['ADMIN']), (req, res) => 
 app.put('/api/faculty/:id', authenticateToken, authorize(['ADMIN']), (req, res) => {
   try {
     const { id } = req.params;
-    const { firstName, lastName, phoneNumber, department, designation, specialization, joiningDate } = req.body;
+    const { firstName, lastName, phoneNumber, employeeId, department, designation, specialization, joiningDate } = req.body;
 
     const updateFacultyTx = db.transaction(() => {
       db.prepare(`
@@ -1000,9 +1007,9 @@ app.put('/api/faculty/:id', authenticateToken, authorize(['ADMIN']), (req, res) 
       `).run(firstName, lastName, phoneNumber, id);
 
       db.prepare(`
-        UPDATE faculty SET department = ?, designation = ?, specialization = ?, joining_date = ?
+        UPDATE faculty SET employee_id = ?, department = ?, designation = ?, specialization = ?, joining_date = ?
         WHERE faculty_id = ?
-      `).run(department, designation, specialization, joiningDate, id);
+      `).run(employeeId, department, designation, specialization, joiningDate, id);
     });
 
     updateFacultyTx();

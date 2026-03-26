@@ -53,7 +53,7 @@ export default function AssignmentCreate() {
     dueDate: '',
     maxMarks: ''
   });
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {

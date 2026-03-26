@@ -17,14 +17,22 @@ import {
   CircularProgress,
   Select,
   MenuItem,
-  IconButton
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LogoutIcon from '@mui/icons-material/Logout';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useAuth } from '../../context/AuthContext';
 import courseService from '../../services/courseService';
 import enrollmentService from '../../services/enrollmentService';
+import studentService from '../../services/studentService';
 
 export default function EnrollmentManagement() {
   const [courses, setCourses] = useState([]);
@@ -33,11 +41,15 @@ export default function EnrollmentManagement() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
-  const { user, logout } = useAuth();
+  const [openEnrollDialog, setOpenEnrollDialog] = useState(false);
+  const [allStudents, setAllStudents] = useState([]);
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const { logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchCourses();
+    studentService.getAllStudents().then(setAllStudents).catch(console.error);
   }, []);
 
   const fetchCourses = async () => {
@@ -83,6 +95,19 @@ export default function EnrollmentManagement() {
     }
   };
 
+  const handleAdminEnroll = async () => {
+    if (!selectedStudentId || !selectedCourse) return;
+    try {
+      await enrollmentService.adminEnrollStudent(selectedStudentId, selectedCourse);
+      showMessage('Student enrolled successfully', 'success');
+      setOpenEnrollDialog(false);
+      setSelectedStudentId('');
+      fetchEnrollments(selectedCourse);
+    } catch (error) {
+      showMessage('Error: ' + (error.response?.data?.message || error.message), 'error');
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -100,7 +125,10 @@ export default function EnrollmentManagement() {
     <Box>
       <AppBar position="static">
         <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+          <IconButton color="inherit" onClick={() => navigate('/admin')} sx={{ mr: 1 }}>
+            <ArrowBackIcon />
+          </IconButton>
+          <Typography variant="h6" sx={{ flexGrow: 1, color: 'white' }}>
             Admin - Enrollment Management
           </Typography>
           <IconButton color="inherit" onClick={handleLogout}>
@@ -117,7 +145,7 @@ export default function EnrollmentManagement() {
         )}
 
         <Box sx={{ mb: 3 }}>
-          <Typography variant="h5" sx={{ mb: 2 }}>Select Course</Typography>
+          <Typography variant="h5" sx={{ mb: 2, color: 'black' }}>Select Course</Typography>
           <Select
             value={selectedCourse}
             onChange={handleCourseChange}
@@ -132,9 +160,16 @@ export default function EnrollmentManagement() {
           </Select>
         </Box>
 
-        <Typography variant="h5" sx={{ mb: 2 }}>
-          Enrolled Students ({enrollments.length})
-        </Typography>
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h5" sx={{ color: 'black' }}>
+            Enrolled Students ({enrollments.length})
+          </Typography>
+          {selectedCourse && (
+            <Button variant="contained" color="primary" onClick={() => setOpenEnrollDialog(true)}>
+              Enroll Student
+            </Button>
+          )}
+        </Box>
 
         <TableContainer component={Paper}>
           <Table>
@@ -186,6 +221,33 @@ export default function EnrollmentManagement() {
           </Table>
         </TableContainer>
       </Container>
+
+      <Dialog open={openEnrollDialog} onClose={() => setOpenEnrollDialog(false)} fullWidth maxWidth="sm" disableEnforceFocus>
+        <DialogTitle sx={{ color: 'black' }}>Enroll Student in Course</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <FormControl fullWidth>
+            <InputLabel>Select Student</InputLabel>
+            <Select
+              value={selectedStudentId}
+              onChange={(e) => setSelectedStudentId(e.target.value)}
+              label="Select Student"
+            >
+              <MenuItem value="">-- Select Student --</MenuItem>
+              {allStudents.map(s => (
+                <MenuItem key={s.studentId || s.userId} value={s.studentId || s.userId}>
+                  {s.firstName} {s.lastName} ({s.enrollmentNo || s.email})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setOpenEnrollDialog(false); setSelectedStudentId(''); }}>Cancel</Button>
+          <Button onClick={handleAdminEnroll} variant="contained" color="primary" disabled={!selectedStudentId}>
+            Enroll
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

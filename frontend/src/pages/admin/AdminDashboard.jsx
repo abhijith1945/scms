@@ -33,6 +33,8 @@ export default function AdminDashboard() {
 
   const menuItems = [
     { label: 'User Management', path: '/admin/users' },
+    { label: 'Student Management', path: '/admin/students' },
+    { label: 'Faculty Management', path: '/admin/faculty' },
     { label: 'Course Management', path: '/admin/courses' },
     { label: 'Enrollment Management', path: '/admin/enrollments' }
   ];
@@ -102,6 +104,40 @@ export default function AdminDashboard() {
                 <Typography variant="h6">User Management</Typography>
                 <Typography variant="body2" color="textSecondary">
                   Create, edit, delete users
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              sx={{ cursor: 'pointer', '&:hover': { boxShadow: 4 } }}
+              onClick={() => navigate('/admin/students')}
+            >
+              <CardContent>
+                <Typography color="primary" gutterBottom>
+                  🎓
+                </Typography>
+                <Typography variant="h6">Student Management</Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Manage student records
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              sx={{ cursor: 'pointer', '&:hover': { boxShadow: 4 } }}
+              onClick={() => navigate('/admin/faculty')}
+            >
+              <CardContent>
+                <Typography color="primary" gutterBottom>
+                  👨‍🏫
+                </Typography>
+                <Typography variant="h6">Faculty Management</Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Manage faculty records
                 </Typography>
               </CardContent>
             </Card>

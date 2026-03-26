@@ -54,7 +54,7 @@ export default function GradeSubmissions() {
   const fetchCoursesTaughtByFaculty = async () => {
     try {
       setLoading(true);
-      const allCourses = await courseService.getAllCourses();
+      const allCourses = await courseService.getMyCourses();
       setCourses(allCourses);
       if (allCourses.length > 0) {
         setSelectedCourse(allCourses[0].courseId);

@@ -23,6 +23,11 @@ const enrollmentService = {
   dropEnrollment: async (enrollmentId) => {
     const response = await api.delete(`/api/enrollments/${enrollmentId}`);
     return response.data;
+  },
+
+  adminEnrollStudent: async (studentId, courseId) => {
+    const response = await api.post('/api/enrollments/admin', { studentId, courseId });
+    return response.data;
   }
 };
 

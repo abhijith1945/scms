@@ -248,7 +248,17 @@ app.delete('/api/users/:id', authenticateToken, authorize(['ADMIN']), (req, res)
 // GET ALL COURSES
 app.get('/api/courses', authenticateToken, (req, res) => {
   try {
-    const courses = db.prepare('SELECT * FROM courses WHERE is_active = 1').all();
+    const courses = db.prepare(`
+      SELECT c.*,
+             COUNT(DISTINCT e.student_id) as enrolled_count,
+             u.first_name as faculty_first_name,
+             u.last_name as faculty_last_name
+      FROM courses c
+      LEFT JOIN enrollments e ON c.course_id = e.course_id AND e.status = 'ACTIVE'
+      LEFT JOIN users u ON c.faculty_id = u.user_id
+      WHERE c.is_active = 1
+      GROUP BY c.course_id
+    `).all();
     res.json(courses.map(c => snakeToCamel(c)));
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -264,6 +274,24 @@ app.get('/api/courses/enrolled', authenticateToken, authorize(['STUDENT']), (req
       WHERE e.student_id = ? AND e.status = 'ACTIVE'
     `).all(req.user.userId);
 
+    res.json(courses.map(c => snakeToCamel(c)));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// GET FACULTY'S OWN COURSES (Faculty only)
+app.get('/api/courses/my', authenticateToken, authorize(['FACULTY']), (req, res) => {
+  try {
+    const courses = db.prepare(`
+      SELECT c.*,
+             COUNT(DISTINCT e.student_id) as enrolled_count
+      FROM courses c
+      JOIN course_faculty cf ON c.course_id = cf.course_id
+      LEFT JOIN enrollments e ON c.course_id = e.course_id AND e.status = 'ACTIVE'
+      WHERE cf.faculty_id = ? AND c.is_active = 1
+      GROUP BY c.course_id
+    `).all(req.user.userId);
     res.json(courses.map(c => snakeToCamel(c)));
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -341,7 +369,70 @@ app.delete('/api/courses/:id', authenticateToken, authorize(['ADMIN']), (req, re
   }
 });
 
+// ===== COURSE-FACULTY ENDPOINTS =====
+
+// GET FACULTY FOR COURSE
+app.get('/api/courses/:id/faculty', authenticateToken, (req, res) => {
+  try {
+    const { id } = req.params;
+    const faculty = db.prepare(`
+      SELECT f.faculty_id, f.employee_id, f.department, f.designation, f.specialization,
+             u.first_name, u.last_name, u.email
+      FROM course_faculty cf
+      JOIN faculty f ON cf.faculty_id = f.faculty_id
+      JOIN users u ON f.faculty_id = u.user_id
+      WHERE cf.course_id = ?
+    `).all(id);
+    res.json(faculty.map(f => snakeToCamel(f)));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// ASSIGN FACULTY TO COURSE (Admin only)
+app.post('/api/courses/:id/faculty', authenticateToken, authorize(['ADMIN']), (req, res) => {
+  try {
+    const { id } = req.params;
+    const { facultyId } = req.body;
+    const existing = db.prepare('SELECT 1 FROM course_faculty WHERE course_id = ? AND faculty_id = ?').get(id, facultyId);
+    if (existing) {
+      return res.status(409).json({ message: 'Faculty already assigned to this course' });
+    }
+    db.prepare('INSERT INTO course_faculty (course_id, faculty_id) VALUES (?, ?)').run(id, facultyId);
+    res.json({ message: 'Faculty assigned to course' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// REMOVE FACULTY FROM COURSE (Admin only)
+app.delete('/api/courses/:id/faculty/:facultyId', authenticateToken, authorize(['ADMIN']), (req, res) => {
+  try {
+    const { id, facultyId } = req.params;
+    db.prepare('DELETE FROM course_faculty WHERE course_id = ? AND faculty_id = ?').run(id, facultyId);
+    res.json({ message: 'Faculty removed from course' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // ===== ENROLLMENT ENDPOINTS =====
+
+// ADMIN ENROLLS STUDENT IN COURSE
+app.post('/api/enrollments/admin', authenticateToken, authorize(['ADMIN']), (req, res) => {
+  try {
+    const { studentId, courseId } = req.body;
+    const existing = db.prepare('SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?').get(studentId, courseId);
+    if (existing) {
+      return res.status(400).json({ message: 'Student already enrolled in this course' });
+    }
+    const result = db.prepare("INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, 'ACTIVE')").run(studentId, courseId);
+    const enrollment = db.prepare('SELECT * FROM enrollments WHERE enrollment_id = ?').get(result.lastInsertRowid);
+    res.json({ message: 'Student enrolled successfully', enrollment: snakeToCamel(enrollment) });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
 
 // GET ENROLLMENTS FOR COURSE (Faculty only)
 app.get('/api/enrollments/course/:courseId', authenticateToken, authorize(['FACULTY', 'ADMIN']), (req, res) => {
@@ -732,6 +823,209 @@ app.delete('/api/submissions/:id', authenticateToken, authorize(['ADMIN']), (req
     const { id } = req.params;
     db.prepare('DELETE FROM submissions WHERE submission_id = ?').run(id);
     res.json({ message: 'Submission deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// ===== STUDENTS ENDPOINTS =====
+
+// GET ALL STUDENTS (Admin/Faculty)
+app.get('/api/students', authenticateToken, authorize(['ADMIN', 'FACULTY']), (req, res) => {
+  try {
+    const students = db.prepare(`
+      SELECT u.user_id, u.email, u.first_name, u.last_name, u.phone_number, u.is_active,
+             s.student_id, s.enrollment_no, s.program, s.department, s.enrollment_year, s.current_sem, s.cgpa, s.mentor_faculty_id,
+             mf_user.first_name as mentor_first_name, mf_user.last_name as mentor_last_name
+      FROM students s
+      JOIN users u ON s.student_id = u.user_id
+      LEFT JOIN faculty mf ON s.mentor_faculty_id = mf.faculty_id
+      LEFT JOIN users mf_user ON mf.faculty_id = mf_user.user_id
+    `).all();
+    res.json(students.map(s => snakeToCamel(s)));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// CREATE STUDENT (Admin only)
+app.post('/api/students', authenticateToken, authorize(['ADMIN']), (req, res) => {
+  try {
+    const { email, firstName, lastName, phoneNumber, enrollmentNo, program, department, enrollmentYear, currentSem, mentorFacultyId } = req.body;
+
+    const existing = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    if (existing) {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
+
+    const passwordHash = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
+
+    const createStudentTx = db.transaction(() => {
+      const userResult = db.prepare(`
+        INSERT INTO users (email, password_hash, first_name, last_name, phone_number, user_type)
+        VALUES (?, ?, ?, ?, ?, 'STUDENT')
+      `).run(email, passwordHash, firstName, lastName, phoneNumber);
+
+      const userId = userResult.lastInsertRowid;
+      db.prepare(`
+        INSERT INTO students (student_id, enrollment_no, program, department, enrollment_year, current_sem, mentor_faculty_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(userId, enrollmentNo, program, department, enrollmentYear, currentSem, mentorFacultyId || null);
+
+      return db.prepare(`
+        SELECT u.user_id, u.email, u.first_name, u.last_name, u.phone_number, u.is_active,
+               s.student_id, s.enrollment_no, s.program, s.department, s.enrollment_year, s.current_sem, s.cgpa, s.mentor_faculty_id
+        FROM students s JOIN users u ON s.student_id = u.user_id
+        WHERE s.student_id = ?
+      `).get(userId);
+    });
+
+    const student = createStudentTx();
+    res.json({ message: 'Student created successfully', student: snakeToCamel(student) });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// UPDATE STUDENT (Admin only)
+app.put('/api/students/:id', authenticateToken, authorize(['ADMIN']), (req, res) => {
+  try {
+    const { id } = req.params;
+    const { firstName, lastName, phoneNumber, program, department, enrollmentYear, currentSem, cgpa, mentorFacultyId } = req.body;
+
+    const updateStudentTx = db.transaction(() => {
+      db.prepare(`
+        UPDATE users SET first_name = ?, last_name = ?, phone_number = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ?
+      `).run(firstName, lastName, phoneNumber, id);
+
+      db.prepare(`
+        UPDATE students SET program = ?, department = ?, enrollment_year = ?, current_sem = ?, cgpa = ?, mentor_faculty_id = ?
+        WHERE student_id = ?
+      `).run(program, department, enrollmentYear, currentSem, cgpa, mentorFacultyId || null, id);
+    });
+
+    updateStudentTx();
+
+    const updated = db.prepare(`
+      SELECT u.user_id, u.email, u.first_name, u.last_name, u.phone_number, u.is_active,
+             s.student_id, s.enrollment_no, s.program, s.department, s.enrollment_year, s.current_sem, s.cgpa, s.mentor_faculty_id
+      FROM students s JOIN users u ON s.student_id = u.user_id
+      WHERE s.student_id = ?
+    `).get(id);
+
+    res.json({ message: 'Student updated', student: snakeToCamel(updated) });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// DELETE STUDENT (Admin only) - deletes user, cascade handles student/enrollments/etc.
+app.delete('/api/students/:id', authenticateToken, authorize(['ADMIN']), (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('DELETE FROM users WHERE user_id = ?').run(id);
+    res.json({ message: 'Student deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// ===== FACULTY ENDPOINTS =====
+
+// GET ALL FACULTY (Admin/Faculty)
+app.get('/api/faculty', authenticateToken, authorize(['ADMIN', 'FACULTY']), (req, res) => {
+  try {
+    const faculty = db.prepare(`
+      SELECT u.user_id, u.email, u.first_name, u.last_name, u.phone_number, u.is_active,
+             f.faculty_id, f.employee_id, f.department, f.designation, f.specialization, f.joining_date
+      FROM faculty f
+      JOIN users u ON f.faculty_id = u.user_id
+    `).all();
+    res.json(faculty.map(f => snakeToCamel(f)));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// CREATE FACULTY (Admin only)
+app.post('/api/faculty', authenticateToken, authorize(['ADMIN']), (req, res) => {
+  try {
+    const { email, firstName, lastName, phoneNumber, employeeId, department, designation, specialization, joiningDate } = req.body;
+
+    const existing = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    if (existing) {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
+
+    const passwordHash = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
+
+    const createFacultyTx = db.transaction(() => {
+      const userResult = db.prepare(`
+        INSERT INTO users (email, password_hash, first_name, last_name, phone_number, user_type)
+        VALUES (?, ?, ?, ?, ?, 'FACULTY')
+      `).run(email, passwordHash, firstName, lastName, phoneNumber);
+
+      const userId = userResult.lastInsertRowid;
+      db.prepare(`
+        INSERT INTO faculty (faculty_id, employee_id, department, designation, specialization, joining_date)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(userId, employeeId, department, designation, specialization, joiningDate);
+
+      return db.prepare(`
+        SELECT u.user_id, u.email, u.first_name, u.last_name, u.phone_number, u.is_active,
+               f.faculty_id, f.employee_id, f.department, f.designation, f.specialization, f.joining_date
+        FROM faculty f JOIN users u ON f.faculty_id = u.user_id
+        WHERE f.faculty_id = ?
+      `).get(userId);
+    });
+
+    const faculty = createFacultyTx();
+    res.json({ message: 'Faculty created successfully', faculty: snakeToCamel(faculty) });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// UPDATE FACULTY (Admin only)
+app.put('/api/faculty/:id', authenticateToken, authorize(['ADMIN']), (req, res) => {
+  try {
+    const { id } = req.params;
+    const { firstName, lastName, phoneNumber, department, designation, specialization, joiningDate } = req.body;
+
+    const updateFacultyTx = db.transaction(() => {
+      db.prepare(`
+        UPDATE users SET first_name = ?, last_name = ?, phone_number = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ?
+      `).run(firstName, lastName, phoneNumber, id);
+
+      db.prepare(`
+        UPDATE faculty SET department = ?, designation = ?, specialization = ?, joining_date = ?
+        WHERE faculty_id = ?
+      `).run(department, designation, specialization, joiningDate, id);
+    });
+
+    updateFacultyTx();
+
+    const updated = db.prepare(`
+      SELECT u.user_id, u.email, u.first_name, u.last_name, u.phone_number, u.is_active,
+             f.faculty_id, f.employee_id, f.department, f.designation, f.specialization, f.joining_date
+      FROM faculty f JOIN users u ON f.faculty_id = u.user_id
+      WHERE f.faculty_id = ?
+    `).get(id);
+
+    res.json({ message: 'Faculty updated', faculty: snakeToCamel(updated) });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// DELETE FACULTY (Admin only)
+app.delete('/api/faculty/:id', authenticateToken, authorize(['ADMIN']), (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('DELETE FROM users WHERE user_id = ?').run(id);
+    res.json({ message: 'Faculty deleted successfully' });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }

@@ -26,13 +26,14 @@ import {
   CircularProgress,
   IconButton
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../../context/AuthContext';
 import assignmentService from '../../services/assignmentService';
 import courseService from '../../services/courseService';
 
 export default function GradeSubmissions() {
+  const [searchParams] = useSearchParams();
   const [courses, setCourses] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [submissions, setSubmissions] = useState([]);
@@ -46,6 +47,7 @@ export default function GradeSubmissions() {
   const [gradeData, setGradeData] = useState({ marks: '', feedback: '' });
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const preselectedCourseId = searchParams.get('courseId');
 
   useEffect(() => {
     fetchCoursesTaughtByFaculty();
@@ -55,10 +57,15 @@ export default function GradeSubmissions() {
     try {
       setLoading(true);
       const allCourses = await courseService.getAllCourses();
-      setCourses(allCourses);
-      if (allCourses.length > 0) {
-        setSelectedCourse(allCourses[0].courseId);
-        fetchAssignmentsByCourse(allCourses[0].courseId);
+      const ownCourses = allCourses.filter((c) => Number(c.facultyId) === Number(user?.userId));
+      setCourses(ownCourses);
+      if (ownCourses.length > 0) {
+        const matchingCourse = preselectedCourseId
+          ? ownCourses.find((c) => Number(c.courseId) === Number(preselectedCourseId))
+          : null;
+        const initialCourseId = matchingCourse ? matchingCourse.courseId : ownCourses[0].courseId;
+        setSelectedCourse(initialCourseId);
+        fetchAssignmentsByCourse(initialCourseId);
       }
     } catch (error) {
       showMessage('Error fetching courses: ' + error.message, 'error');
@@ -72,8 +79,8 @@ export default function GradeSubmissions() {
       const data = await assignmentService.getAssignmentsByCourse(courseId);
       setAssignments(data);
       if (data.length > 0) {
-        setSelectedAssignment(data[0].assignment_id);
-        fetchSubmissions(data[0].assignment_id);
+        setSelectedAssignment(data[0].assignmentId);
+        fetchSubmissions(data[0].assignmentId);
       } else {
         setSubmissions([]);
       }
@@ -106,7 +113,7 @@ export default function GradeSubmissions() {
   const handleOpenGradeDialog = (submission) => {
     setGradingSubmission(submission);
     setGradeData({
-      marks: submission.marks || '',
+      marks: submission.marksObtained || '',
       feedback: submission.feedback || ''
     });
     setOpenGradeDialog(true);
@@ -120,12 +127,12 @@ export default function GradeSubmissions() {
 
   const handleSaveGrade = async () => {
     try {
-      if (!gradeData.marks || gradeData.marks < 0) {
+      if (gradeData.marks === '' || Number(gradeData.marks) < 0) {
         showMessage('Please enter valid marks', 'error');
         return;
       }
-      await assignmentService.gradeSubmission(gradingSubmission.submission_id, {
-        marks: parseInt(gradeData.marks),
+      await assignmentService.gradeSubmission(gradingSubmission.submissionId, {
+        marksObtained: parseInt(gradeData.marks, 10),
         feedback: gradeData.feedback
       });
       showMessage('Submission graded successfully', 'success');
@@ -164,13 +171,30 @@ export default function GradeSubmissions() {
 
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {message && (
-          <Alert severity={messageType} sx={{ mb: 2 }}>
+          <Alert
+            severity={messageType}
+            sx={{
+              mb: 2,
+              '& .MuiAlert-message': { color: '#111827' }
+            }}
+          >
             {message}
           </Alert>
         )}
 
         <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-          <FormControl sx={{ minWidth: 250 }}>
+          <FormControl
+            sx={{
+              minWidth: 250,
+              '& .MuiInputLabel-root': { color: '#f8fafc' },
+              '& .MuiInputLabel-root.Mui-focused': { color: '#f8fafc' },
+              '& .MuiOutlinedInput-root': { color: '#f8fafc' },
+              '& .MuiSvgIcon-root': { color: '#f8fafc' },
+              '& .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' },
+              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' },
+              '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' }
+            }}
+          >
             <InputLabel>Course</InputLabel>
             <Select value={selectedCourse} onChange={handleCourseChange} label="Course">
               {courses.map(course => (
@@ -181,11 +205,22 @@ export default function GradeSubmissions() {
             </Select>
           </FormControl>
 
-          <FormControl sx={{ minWidth: 250 }}>
+          <FormControl
+            sx={{
+              minWidth: 250,
+              '& .MuiInputLabel-root': { color: '#f8fafc' },
+              '& .MuiInputLabel-root.Mui-focused': { color: '#f8fafc' },
+              '& .MuiOutlinedInput-root': { color: '#f8fafc' },
+              '& .MuiSvgIcon-root': { color: '#f8fafc' },
+              '& .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' },
+              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' },
+              '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' }
+            }}
+          >
             <InputLabel>Assignment</InputLabel>
             <Select value={selectedAssignment} onChange={handleAssignmentChange} label="Assignment">
               {assignments.map(assignment => (
-                <MenuItem key={assignment.assignment_id} value={assignment.assignment_id}>
+                <MenuItem key={assignment.assignmentId} value={assignment.assignmentId}>
                   {assignment.title}
                 </MenuItem>
               ))}
@@ -194,7 +229,7 @@ export default function GradeSubmissions() {
         </Box>
 
         <Typography variant="h5" sx={{ mb: 2 }}>
-          Submissions ({submissions.length})
+          Student Submission Status ({submissions.length})
         </Typography>
 
         <TableContainer component={Paper}>
@@ -203,7 +238,8 @@ export default function GradeSubmissions() {
               <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                 <TableCell><strong>Student Name</strong></TableCell>
                 <TableCell><strong>Email</strong></TableCell>
-                <TableCell><strong>Submitted</strong></TableCell>
+                <TableCell><strong>Status</strong></TableCell>
+                <TableCell><strong>Submitted On</strong></TableCell>
                 <TableCell align="center"><strong>Marks</strong></TableCell>
                 <TableCell><strong>Feedback</strong></TableCell>
                 <TableCell align="center"><strong>Action</strong></TableCell>
@@ -212,32 +248,46 @@ export default function GradeSubmissions() {
             <TableBody>
               {submissions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
-                    No submissions yet
+                  <TableCell colSpan={7} align="center">
+                    No students found for this assignment/course
                   </TableCell>
                 </TableRow>
               ) : (
                 submissions.map(submission => (
-                  <TableRow key={submission.submission_id}>
+                  <TableRow key={submission.submissionId || `student-${submission.studentId}`}>
                     <TableCell>{submission.firstName} {submission.lastName}</TableCell>
                     <TableCell>{submission.email}</TableCell>
-                    <TableCell>{new Date(submission.submitted_at).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      {submission.submitted ? (
+                        <Typography sx={{ color: '#388e3c', fontWeight: 'bold' }}>SUBMITTED</Typography>
+                      ) : (
+                        <Typography sx={{ color: '#d32f2f', fontWeight: 'bold' }}>NOT SUBMITTED</Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {submission.submissionDate
+                        ? new Date(submission.submissionDate).toLocaleDateString()
+                        : '-'}
+                    </TableCell>
                     <TableCell align="center">
-                      {submission.marks !== null ? (
+                      {submission.submitted && submission.marksObtained !== null ? (
                         <Typography sx={{ fontWeight: 'bold', color: '#388e3c' }}>
-                          {submission.marks}
+                          {submission.marksObtained}
                         </Typography>
                       ) : (
-                        <Typography sx={{ color: '#d32f2f' }}>Not graded</Typography>
+                        <Typography sx={{ color: '#d32f2f' }}>
+                          {submission.submitted ? 'Not graded' : '-'}
+                        </Typography>
                       )}
                     </TableCell>
                     <TableCell sx={{ maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {submission.feedback || '-'}
+                      {submission.submitted ? (submission.feedback || '-') : '-'}
                     </TableCell>
                     <TableCell align="center">
                       <Button
                         size="small"
                         variant="contained"
+                        disabled={!submission.submitted}
                         onClick={() => handleOpenGradeDialog(submission)}
                       >
                         Grade
@@ -258,7 +308,7 @@ export default function GradeSubmissions() {
             <Box sx={{ mb: 2 }}>
               <Typography><strong>Student:</strong> {gradingSubmission.firstName} {gradingSubmission.lastName}</Typography>
               <Typography><strong>Email:</strong> {gradingSubmission.email}</Typography>
-              <Typography><strong>Submitted:</strong> {new Date(gradingSubmission.submitted_at).toLocaleString()}</Typography>
+              <Typography><strong>Submitted:</strong> {new Date(gradingSubmission.submissionDate).toLocaleString()}</Typography>
             </Box>
           )}
           <TextField

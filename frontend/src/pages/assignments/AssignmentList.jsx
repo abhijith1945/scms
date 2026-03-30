@@ -77,7 +77,7 @@ export default function AssignmentList() {
 
       <Grid container spacing={3}>
         {assignments.map((assignment) => (
-          <Grid item xs={12} md={6} key={assignment.assignmentId}>
+          <Grid size={{ xs: 12, md: 6 }} key={assignment.assignmentId}>
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
@@ -133,7 +133,7 @@ export default function AssignmentList() {
         ))}
 
         {assignments.length === 0 && (
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Card>
               <CardContent>
                 <Typography align="center">No assignments found</Typography>

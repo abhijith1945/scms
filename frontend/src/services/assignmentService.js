@@ -54,10 +54,10 @@ const assignmentService = {
   },
 
   // Grade a submission (Faculty only)
-  gradeSubmission: async (submissionId, marksObtained, feedback) => {
+  gradeSubmission: async (submissionId, gradeData) => {
     const response = await api.put(`/api/submissions/${submissionId}`, {
-      marksObtained,
-      feedback
+      marksObtained: gradeData.marksObtained,
+      feedback: gradeData.feedback
     });
     return response.data;
   },

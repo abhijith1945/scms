@@ -8,7 +8,7 @@ import UserManagement from './pages/admin/UserManagement';
 import CourseManagement from './pages/admin/CourseManagement';
 import EnrollmentManagement from './pages/admin/EnrollmentManagement';
 import AttendanceView from './pages/attendance/AttendanceView';
-import MarkAttendance from './pages/attendance/MarkAttendance';
+import MarkAttendance from './pages/faculty/MarkAttendance';
 import AssignmentList from './pages/assignments/AssignmentList';
 import SubmitAssignment from './pages/assignments/SubmitAssignment';
 import GradeSubmissions from './pages/faculty/GradeSubmissions';

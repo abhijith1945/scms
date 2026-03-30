@@ -30,7 +30,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -39,6 +39,7 @@ import assignmentService from '../../services/assignmentService';
 import courseService from '../../services/courseService';
 
 export default function AssignmentCreate() {
+  const [searchParams] = useSearchParams();
   const [courses, setCourses] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState('');
@@ -55,6 +56,7 @@ export default function AssignmentCreate() {
   });
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const preselectedCourseId = searchParams.get('courseId');
 
   useEffect(() => {
     fetchCourses();
@@ -66,8 +68,12 @@ export default function AssignmentCreate() {
       const data = await courseService.getAllCourses();
       setCourses(data);
       if (data.length > 0) {
-        setSelectedCourse(data[0].courseId);
-        fetchAssignments(data[0].courseId);
+        const matchingCourse = preselectedCourseId
+          ? data.find((c) => Number(c.courseId) === Number(preselectedCourseId))
+          : null;
+        const initialCourseId = matchingCourse ? matchingCourse.courseId : data[0].courseId;
+        setSelectedCourse(initialCourseId);
+        fetchAssignments(initialCourseId);
       }
     } catch (error) {
       showMessage('Error fetching courses: ' + error.message, 'error');
@@ -93,12 +99,12 @@ export default function AssignmentCreate() {
 
   const handleOpenDialog = (assignment = null) => {
     if (assignment) {
-      setEditingId(assignment.assignment_id);
+      setEditingId(assignment.assignmentId);
       setFormData({
         title: assignment.title,
         description: assignment.description,
-        dueDate: assignment.due_date ? assignment.due_date.split('T')[0] : '',
-        maxMarks: assignment.max_marks
+        dueDate: assignment.dueDate ? assignment.dueDate.split('T')[0] : '',
+        maxMarks: assignment.maxMarks
       });
     } else {
       setEditingId(null);
@@ -121,11 +127,11 @@ export default function AssignmentCreate() {
       }
 
       const assignmentPayload = {
-        course_id: selectedCourse,
+        courseId: selectedCourse,
         title: formData.title,
         description: formData.description,
-        due_date: formData.dueDate,
-        max_marks: parseInt(formData.maxMarks)
+        dueDate: formData.dueDate,
+        maxMarks: parseInt(formData.maxMarks, 10)
       };
 
       if (editingId) {
@@ -182,13 +188,30 @@ export default function AssignmentCreate() {
 
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {message && (
-          <Alert severity={messageType} sx={{ mb: 2 }}>
+          <Alert
+            severity={messageType}
+            sx={{
+              mb: 2,
+              '& .MuiAlert-message': { color: '#111827' }
+            }}
+          >
             {message}
           </Alert>
         )}
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <FormControl sx={{ minWidth: 250 }}>
+          <FormControl
+            sx={{
+              minWidth: 250,
+              '& .MuiInputLabel-root': { color: '#f8fafc' },
+              '& .MuiInputLabel-root.Mui-focused': { color: '#f8fafc' },
+              '& .MuiOutlinedInput-root': { color: '#f8fafc' },
+              '& .MuiSvgIcon-root': { color: '#f8fafc' },
+              '& .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' },
+              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' },
+              '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' }
+            }}
+          >
             <InputLabel>Select Course</InputLabel>
             <Select value={selectedCourse} onChange={handleCourseChange} label="Select Course">
               {courses.map(course => (
@@ -228,13 +251,13 @@ export default function AssignmentCreate() {
                 </TableRow>
               ) : (
                 assignments.map(assignment => (
-                  <TableRow key={assignment.assignment_id}>
+                  <TableRow key={assignment.assignmentId}>
                     <TableCell><strong>{assignment.title}</strong></TableCell>
                     <TableCell sx={{ maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {assignment.description}
                     </TableCell>
-                    <TableCell>{new Date(assignment.due_date).toLocaleDateString()}</TableCell>
-                    <TableCell align="center">{assignment.max_marks}</TableCell>
+                    <TableCell>{new Date(assignment.dueDate).toLocaleDateString()}</TableCell>
+                    <TableCell align="center">{assignment.maxMarks}</TableCell>
                     <TableCell align="center">
                       <IconButton
                         size="small"
@@ -245,7 +268,7 @@ export default function AssignmentCreate() {
                       </IconButton>
                       <IconButton
                         size="small"
-                        onClick={() => handleDelete(assignment.assignment_id)}
+                        onClick={() => handleDelete(assignment.assignmentId)}
                         color="error"
                       >
                         <DeleteIcon />

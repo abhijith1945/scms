@@ -13,6 +13,13 @@ const attendanceService = {
     return response.data;
   },
 
+  getCourseAttendanceByDate: async (courseId, date) => {
+    const response = await api.get(`/api/attendance/course/${courseId}`, {
+      params: { date }
+    });
+    return response.data;
+  },
+
   // Mark attendance (bulk)
   bulkMarkAttendance: async (attendanceList) => {
     const response = await api.post('/api/attendance/bulk', attendanceList);

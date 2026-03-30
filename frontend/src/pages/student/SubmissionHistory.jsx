@@ -66,7 +66,7 @@ export default function SubmissionHistory() {
   };
 
   const handleDownloadSubmission = (submission) => {
-    if (submission.file_path) {
+    if (submission.filePath) {
       // In a real system, this would download the file from the backend
       showMessage('Download feature would work with proper file server', 'info');
     } else {
@@ -109,8 +109,8 @@ export default function SubmissionHistory() {
   if (loading) return <CircularProgress />;
 
   const submittedCount = submissions.filter(s => s.status === 'SUBMITTED').length;
-  const gradedCount = submissions.filter(s => s.marks !== null).length;
-  const pendingCount = submissions.filter(s => s.marks === null).length;
+  const gradedCount = submissions.filter(s => s.marksObtained !== null).length;
+  const pendingCount = submissions.filter(s => s.marksObtained === null).length;
 
   return (
     <Box>
@@ -182,17 +182,17 @@ export default function SubmissionHistory() {
                 </TableRow>
               ) : (
                 submissions.map(submission => {
-                  const gradeStatus = getGradeStatus(submission.marks);
+                  const gradeStatus = getGradeStatus(submission.marksObtained);
                   
                   return (
-                    <TableRow key={submission.submission_id}>
+                    <TableRow key={submission.assignmentId}>
                       <TableCell><strong>{submission.courseCode}</strong></TableCell>
-                      <TableCell>{submission.assignment_title}</TableCell>
+                      <TableCell>{submission.title}</TableCell>
                       <TableCell align="center">
-                        {new Date(submission.assignment_due_date).toLocaleDateString()}
+                        {new Date(submission.dueDate).toLocaleDateString()}
                       </TableCell>
                       <TableCell align="center">
-                        {new Date(submission.submitted_at).toLocaleString()}
+                        {submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : '-'}
                       </TableCell>
                       <TableCell align="center">
                         <Chip 
@@ -203,10 +203,10 @@ export default function SubmissionHistory() {
                         />
                       </TableCell>
                       <TableCell align="center">
-                        {submission.marks !== null ? (
+                        {submission.marksObtained !== null ? (
                           <Box>
                             <Typography sx={{ fontWeight: 'bold', color: gradeStatus.color }}>
-                              {submission.marks} / {submission.max_marks || 100}
+                              {submission.marksObtained} / {submission.maxMarks || 100}
                             </Typography>
                             <Typography variant="caption" sx={{ color: gradeStatus.color }}>
                               {gradeStatus.label}
@@ -251,20 +251,20 @@ export default function SubmissionHistory() {
               
               <Box>
                 <Typography variant="caption" color="textSecondary">ASSIGNMENT</Typography>
-                <Typography variant="subtitle1">{selectedSubmission.assignment_title}</Typography>
+                <Typography variant="subtitle1">{selectedSubmission.title}</Typography>
               </Box>
 
               <Box>
                 <Typography variant="caption" color="textSecondary">DUE DATE</Typography>
-                <Typography>{new Date(selectedSubmission.assignment_due_date).toLocaleDateString()}</Typography>
+                <Typography>{new Date(selectedSubmission.dueDate).toLocaleDateString()}</Typography>
               </Box>
 
               <Box>
                 <Typography variant="caption" color="textSecondary">SUBMITTED</Typography>
-                <Typography>{new Date(selectedSubmission.submitted_at).toLocaleString()}</Typography>
+                <Typography>{selectedSubmission.submittedAt ? new Date(selectedSubmission.submittedAt).toLocaleString() : '-'}</Typography>
               </Box>
 
-              {selectedSubmission.file_path && (
+              {selectedSubmission.filePath && (
                 <Box>
                   <Typography variant="caption" color="textSecondary">SUBMITTED FILE</Typography>
                   <Button
@@ -272,17 +272,17 @@ export default function SubmissionHistory() {
                     startIcon={<DownloadIcon />}
                     onClick={() => handleDownloadSubmission(selectedSubmission)}
                   >
-                    {selectedSubmission.file_path.split('/').pop()}
+                    {selectedSubmission.filePath.split('/').pop()}
                   </Button>
                 </Box>
               )}
 
-              {selectedSubmission.marks !== null && (
+              {selectedSubmission.marksObtained !== null && (
                 <>
                   <Box>
                     <Typography variant="caption" color="textSecondary">MARKS OBTAINED</Typography>
-                    <Typography variant="h5" sx={{ color: getGradeStatus(selectedSubmission.marks).color, fontWeight: 'bold' }}>
-                      {selectedSubmission.marks} / {selectedSubmission.max_marks || 100}
+                    <Typography variant="h5" sx={{ color: getGradeStatus(selectedSubmission.marksObtained).color, fontWeight: 'bold' }}>
+                      {selectedSubmission.marksObtained} / {selectedSubmission.maxMarks || 100}
                     </Typography>
                   </Box>
 

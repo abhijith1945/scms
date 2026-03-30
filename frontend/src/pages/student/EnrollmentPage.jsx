@@ -30,6 +30,7 @@ import enrollmentService from '../../services/enrollmentService';
 
 export default function EnrollmentPage() {
   const [courses, setCourses] = useState([]);
+  const [enrollments, setEnrollments] = useState([]);
   const [enrolledCourseIds, setEnrolledCourseIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -48,9 +49,10 @@ export default function EnrollmentPage() {
       setLoading(true);
       const [allCourses, enrolledCourses] = await Promise.all([
         courseService.getAllCourses(),
-        courseService.getEnrolledCourses()
+        enrollmentService.getMyEnrollments()
       ]);
       setCourses(allCourses);
+      setEnrollments(enrolledCourses);
       const enrolledIds = enrolledCourses.map(c => c.courseId);
       setEnrolledCourseIds(enrolledIds);
     } catch (error) {
@@ -84,8 +86,8 @@ export default function EnrollmentPage() {
   const handleDropCourse = async (courseId) => {
     if (window.confirm('Are you sure you want to drop this course?')) {
       try {
-        const enrollment = await courseService.getCourseById(courseId);
-        const enrollmentId = enrollment.enrollments?.[0]?.enrollment_id;
+        const enrollment = enrollments.find((e) => e.courseId === courseId && e.status === 'ACTIVE');
+        const enrollmentId = enrollment?.enrollmentId;
         if (enrollmentId) {
           await enrollmentService.dropEnrollment(enrollmentId);
           showMessage('Successfully dropped course', 'success');
@@ -239,7 +241,7 @@ export default function EnrollmentPage() {
           {selectedCourse && (
             <Box sx={{ pt: 2 }}>
               <Typography><strong>Course:</strong> {selectedCourse.courseCode}</Typography>
-              <Typography><strong>Name:</strong> {selectedCourse.course_name}</Typography>
+              <Typography><strong>Name:</strong> {selectedCourse.courseName}</Typography>
               <Typography><strong>Department:</strong> {selectedCourse.department}</Typography>
               <Typography sx={{ mt: 2 }}>Are you sure you want to enroll in this course?</Typography>
             </Box>

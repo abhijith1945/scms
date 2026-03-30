@@ -34,6 +34,34 @@ export default function AttendanceView() {
     fetchAttendance();
   }, [courseId]);
 
+  const formatIstDate = (value) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata'
+    }).format(date);
+  };
+
+  const formatIstDateTime = (value) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata'
+    }).format(date);
+  };
+
   const fetchAttendance = async () => {
     try {
       const data = await attendanceService.getStudentAttendance(user.userId, courseId);
@@ -115,23 +143,23 @@ export default function AttendanceView() {
               <TableCell>Date</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Marked By</TableCell>
-              <TableCell>Marked At</TableCell>
+              <TableCell>Marked At (IST)</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {attendance.map((record) => (
               <TableRow key={record.attendanceId}>
-                <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
+                <TableCell>{formatIstDate(record.date)}</TableCell>
                 <TableCell>
                   <Chip
                     label={record.status}
-                    color={record.status === 'PRESENT' ? 'success' : 'error'}
+                    color={record.status === 'PRESENT' ? 'success' : record.status === 'LATE' ? 'warning' : 'error'}
                     size="small"
                   />
                 </TableCell>
                 <TableCell>{record.markedByName || 'N/A'}</TableCell>
                 <TableCell>
-                  {new Date(record.markedAt).toLocaleString()}
+                  {formatIstDateTime(record.markedAt)}
                 </TableCell>
               </TableRow>
             ))}

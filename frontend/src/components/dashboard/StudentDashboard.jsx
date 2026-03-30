@@ -85,23 +85,6 @@ export default function StudentDashboard() {
           Welcome, {user?.firstName}!
         </Typography>
 
-        <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
-          <Button 
-            variant="contained" 
-            color="primary"
-            onClick={() => navigate('/student/enrollments')}
-          >
-            Browse & Enroll Courses
-          </Button>
-          <Button 
-            variant="outlined" 
-            color="primary"
-            onClick={fetchDashboardData}
-          >
-            Refresh
-          </Button>
-        </Box>
-
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
@@ -115,7 +98,7 @@ export default function StudentDashboard() {
         <Grid container spacing={3}>
           {courses.length > 0 ? (
             courses.map((course) => (
-              <Grid item xs={12} md={6} key={course.courseId}>
+              <Grid size={{ xs: 12, md: 6 }} key={course.courseId}>
                 <Card>
                   <CardContent>
                     <Typography variant="h6">{course.courseName}</Typography>
@@ -147,7 +130,7 @@ export default function StudentDashboard() {
               </Grid>
             ))
           ) : (
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Alert severity="info">
                 You are not enrolled in any courses yet.
               </Alert>
@@ -184,7 +167,7 @@ export default function StudentDashboard() {
         </Typography>
         <Grid container spacing={2}>
           {assignments.filter(a => !a.submitted).map((assignment) => (
-            <Grid item xs={12} md={6} key={assignment.assignmentId}>
+            <Grid size={{ xs: 12, md: 6 }} key={assignment.assignmentId}>
               <Card>
                 <CardContent>
                   <Typography variant="h6">{assignment.title}</Typography>
@@ -210,7 +193,7 @@ export default function StudentDashboard() {
             </Grid>
           ))}
           {assignments.filter(a => !a.submitted).length === 0 && (
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Typography>No pending assignments</Typography>
             </Grid>
           )}

@@ -77,8 +77,17 @@ export default function FacultyDashboard() {
           Welcome, Prof. {user?.lastName}!
         </Typography>
 
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)}>
+        <Box sx={{ borderBottom: 1, borderColor: '#f8fafc' }}>
+          <Tabs
+            value={tabValue}
+            onChange={(e, v) => setTabValue(v)}
+            textColor="inherit"
+            sx={{
+              '& .MuiTabs-indicator': { backgroundColor: '#f8fafc' },
+              '& .MuiTab-root': { color: '#f8fafc', opacity: 0.8 },
+              '& .Mui-selected': { color: '#f8fafc', opacity: 1 }
+            }}
+          >
             <Tab label="Courses" />
             <Tab label="Attendance" />
             <Tab label="Assignments" />
@@ -91,7 +100,7 @@ export default function FacultyDashboard() {
           </Typography>
           <Grid container spacing={3}>
             {courses.map((course) => (
-              <Grid item xs={12} md={6} key={course.courseId}>
+              <Grid size={{ xs: 12, md: 6 }} key={course.courseId}>
                 <Card>
                   <CardContent>
                     <Typography variant="h6">{course.courseName}</Typography>
@@ -117,7 +126,7 @@ export default function FacultyDashboard() {
           </Typography>
           <Grid container spacing={2}>
             {courses.map((course) => (
-              <Grid item xs={12} md={4} key={course.courseId}>
+              <Grid size={{ xs: 12, md: 4 }} key={course.courseId}>
                 <Card>
                   <CardContent>
                     <Typography variant="h6">{course.courseName}</Typography>
@@ -142,7 +151,7 @@ export default function FacultyDashboard() {
           </Typography>
           <Grid container spacing={2}>
             {courses.map((course) => (
-              <Grid item xs={12} md={4} key={course.courseId}>
+              <Grid size={{ xs: 12, md: 4 }} key={course.courseId}>
                 <Card>
                   <CardContent>
                     <Typography variant="h6">{course.courseName}</Typography>
@@ -150,9 +159,17 @@ export default function FacultyDashboard() {
                       variant="contained"
                       fullWidth
                       sx={{ mt: 2 }}
-                      onClick={() => navigate(`/assignments?courseId=${course.courseId}`)}
+                      onClick={() => navigate(`/faculty/assignments?courseId=${course.courseId}`)}
                     >
-                      View Assignments
+                      Manage Assignments (CRUD)
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      sx={{ mt: 1 }}
+                      onClick={() => navigate(`/faculty/grade-submissions?courseId=${course.courseId}`)}
+                    >
+                      View Submitted / Not Submitted
                     </Button>
                   </CardContent>
                 </Card>

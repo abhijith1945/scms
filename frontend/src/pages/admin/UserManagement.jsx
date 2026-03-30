@@ -22,7 +22,11 @@ import {
   AppBar,
   Toolbar,
   Alert,
-  CircularProgress
+  CircularProgress,
+  FormGroup,
+  FormControlLabel,
+  Checkbox,
+  FormLabel
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -34,6 +38,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../../context/AuthContext';
 import userService from '../../services/userService';
+import api from '../../services/api';
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -42,6 +47,8 @@ export default function UserManagement() {
   const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
+  const [courses, setCourses] = useState([]);
+  const [faculty, setFaculty] = useState([]);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -53,11 +60,16 @@ export default function UserManagement() {
     dateOfBirth: '',
     gender: '',
     address: '',
-    userType: 'STUDENT'
+    userType: 'STUDENT',
+    courseIds: [],
+    facultyId: null,
+    facultyIds: []
   });
 
   useEffect(() => {
     fetchUsers();
+    fetchCourses();
+    fetchFaculty();
   }, []);
 
   const fetchUsers = async () => {
@@ -72,19 +84,53 @@ export default function UserManagement() {
     }
   };
 
-  const handleOpenDialog = (userData = null) => {
+  const fetchCourses = async () => {
+    try {
+      const data = await api.get('/api/courses');
+      setCourses(Array.isArray(data.data) ? data.data : []);
+    } catch (error) {
+      console.log('Error fetching courses:', error);
+    }
+  };
+
+  const fetchFaculty = async () => {
+    try {
+      const data = await api.get('/api/faculty');
+      setFaculty(Array.isArray(data.data) ? data.data : []);
+    } catch (error) {
+      console.log('Error fetching faculty:', error);
+    }
+  };
+
+  const handleOpenDialog = async (userData = null) => {
+    // Always refresh latest teacher-course mapping before opening form.
+    await Promise.all([fetchCourses(), fetchFaculty()]);
+
     if (userData) {
-      setEditingId(userData.userId);
-      setFormData({
-        email: userData.email,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        phoneNumber: userData.phoneNumber || '',
-        dateOfBirth: userData.dateOfBirth || '',
-        gender: userData.gender || '',
-        address: userData.address || '',
-        userType: userData.userType
-      });
+      try {
+        const details = await userService.getUserById(userData.userId);
+        setEditingId(userData.userId);
+        setFormData({
+          email: details.email,
+          firstName: details.firstName,
+          lastName: details.lastName,
+          phoneNumber: details.phoneNumber || '',
+          dateOfBirth: details.dateOfBirth || '',
+          gender: details.gender || '',
+          address: details.address || '',
+          userType: details.userType,
+          courseIds: Array.isArray(details.courseIds)
+            ? details.courseIds.map((id) => Number(id)).filter((id) => !Number.isNaN(id))
+            : [],
+          facultyId: details.assignedFacultyId ? Number(details.assignedFacultyId) : null,
+          facultyIds: Array.isArray(details.courseFaculties) && details.courseFaculties.length > 0
+            ? details.courseFaculties.map((f) => Number(f.facultyId)).filter((id) => !Number.isNaN(id))
+            : (details.assignedFacultyId ? [Number(details.assignedFacultyId)] : [])
+        });
+      } catch (error) {
+        showMessage('Error loading user details: ' + error.message, 'error');
+        return;
+      }
     } else {
       setEditingId(null);
       setFormData({
@@ -95,7 +141,10 @@ export default function UserManagement() {
         dateOfBirth: '',
         gender: '',
         address: '',
-        userType: 'STUDENT'
+        userType: 'STUDENT',
+        courseIds: [],
+        facultyId: null,
+        facultyIds: []
       });
     }
     setOpenDialog(true);
@@ -107,15 +156,26 @@ export default function UserManagement() {
 
   const handleSave = async () => {
     try {
+      const normalizedFacultyIds = Array.isArray(formData.facultyIds)
+        ? formData.facultyIds.map((id) => Number(id)).filter((id) => !Number.isNaN(id))
+        : [];
+
+      const payload = {
+        ...formData,
+        // Backend currently stores one optional mentor; keep first selected teacher as mentor.
+        facultyId: normalizedFacultyIds.length > 0 ? normalizedFacultyIds[0] : null,
+        facultyIds: normalizedFacultyIds
+      };
+
       if (editingId) {
-        await userService.updateUser(editingId, formData);
+        await userService.updateUser(editingId, payload);
         showMessage('User updated successfully', 'success');
       } else {
-        await userService.createUser(formData);
+        await userService.createUser(payload);
         showMessage('User created successfully', 'success');
       }
       handleCloseDialog();
-      fetchUsers();
+      await Promise.all([fetchUsers(), fetchCourses(), fetchFaculty()]);
     } catch (error) {
       showMessage('Error: ' + error.message, 'error');
     }
@@ -152,6 +212,56 @@ export default function UserManagement() {
     }));
   };
 
+  const handleTeacherToggle = (teacherId) => {
+    setFormData((prev) => {
+      const teacherIdNum = Number(teacherId);
+      const currentFacultyIds = Array.isArray(prev.facultyIds)
+        ? prev.facultyIds.map((id) => Number(id)).filter((id) => !Number.isNaN(id))
+        : [];
+      const isSelected = currentFacultyIds.includes(teacherIdNum);
+      const nextFacultyIds = isSelected
+        ? currentFacultyIds.filter((id) => id !== teacherIdNum)
+        : [...currentFacultyIds, teacherIdNum];
+
+      const nextAllowedCourseIds = courses
+        .filter((course) => nextFacultyIds.includes(Number(course.facultyId)))
+        .map((course) => Number(course.courseId));
+
+      return {
+        ...prev,
+        facultyIds: nextFacultyIds,
+        facultyId: nextFacultyIds.length > 0 ? nextFacultyIds[0] : null,
+        // Keep only courses taught by currently selected teachers.
+        courseIds: prev.courseIds.filter((courseId) => nextAllowedCourseIds.includes(Number(courseId)))
+      };
+    });
+  };
+
+  const handleCourseToggle = (courseId) => {
+    setFormData((prev) => {
+      const courseIdNum = Number(courseId);
+      const normalizedCourseIds = Array.isArray(prev.courseIds)
+        ? prev.courseIds.map((id) => Number(id)).filter((id) => !Number.isNaN(id))
+        : [];
+      const exists = normalizedCourseIds.includes(courseIdNum);
+      return {
+        ...prev,
+        courseIds: exists
+          ? normalizedCourseIds.filter((id) => id !== courseIdNum)
+          : [...normalizedCourseIds, courseIdNum]
+      };
+    });
+  };
+
+  const availableCourses = formData.userType === 'STUDENT'
+    ? courses.filter((c) => {
+      const selectedFacultyIds = Array.isArray(formData.facultyIds)
+        ? formData.facultyIds.map((id) => Number(id)).filter((id) => !Number.isNaN(id))
+        : [];
+      return selectedFacultyIds.includes(Number(c.facultyId));
+    })
+    : courses;
+
   if (loading) return <CircularProgress />;
 
   return (
@@ -169,7 +279,13 @@ export default function UserManagement() {
 
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {message && (
-          <Alert severity={messageType} sx={{ mb: 2 }}>
+          <Alert
+            severity={messageType}
+            sx={{
+              mb: 2,
+              '& .MuiAlert-message': { color: '#111827' }
+            }}
+          >
             {message}
           </Alert>
         )}
@@ -300,12 +416,85 @@ export default function UserManagement() {
           <Select
             name="userType"
             value={formData.userType}
-            onChange={handleInputChange}
+            onChange={(e) => {
+              const nextType = e.target.value;
+              setFormData((prev) => ({
+                ...prev,
+                userType: nextType,
+                facultyIds: nextType === 'STUDENT' ? prev.facultyIds : [],
+                facultyId: nextType === 'STUDENT' ? prev.facultyId : null,
+                courseIds: nextType === 'STUDENT'
+                  ? prev.courseIds
+                  : prev.courseIds
+              }));
+            }}
           >
             <MenuItem value="STUDENT">Student</MenuItem>
             <MenuItem value="FACULTY">Faculty</MenuItem>
             <MenuItem value="ADMIN">Admin</MenuItem>
           </Select>
+
+          {formData.userType === 'STUDENT' && faculty.length > 0 && (
+            <Box>
+              <FormLabel sx={{ color: '#f8fafc' }}>Select Teachers (Tick Multiple)</FormLabel>
+              <FormGroup sx={{ mt: 1 }}>
+                {faculty.map((f) => (
+                  <FormControlLabel
+                    key={f.userId}
+                    control={
+                      <Checkbox
+                        checked={Array.isArray(formData.facultyIds) && formData.facultyIds.includes(Number(f.userId))}
+                        onChange={() => handleTeacherToggle(Number(f.userId))}
+                      />
+                    }
+                    label={`${f.firstName} ${f.lastName}${f.designation ? ` (${f.designation})` : ''}`}
+                  />
+                ))}
+              </FormGroup>
+            </Box>
+          )}
+
+          {courses.length > 0 && (
+            <Box>
+              <FormLabel sx={{ color: '#f8fafc' }}>
+                {formData.userType === 'STUDENT' ? 'Select Courses for Chosen Teacher' : 'Assign Courses'}
+              </FormLabel>
+
+              {formData.userType === 'STUDENT' && (!Array.isArray(formData.facultyIds) || formData.facultyIds.length === 0) && (
+                <Typography variant="body2" sx={{ mt: 1, color: '#cbd5e1' }}>
+                  First select one or more teachers, then tick the subjects taught by them.
+                </Typography>
+              )}
+
+              {availableCourses.length === 0 && (
+                <Typography variant="body2" sx={{ mt: 1, color: '#cbd5e1' }}>
+                  No courses found for the selected teacher.
+                </Typography>
+              )}
+
+              <FormGroup sx={{ mt: 1 }}>
+                {availableCourses.map((c) => (
+                  <FormControlLabel
+                    key={c.courseId}
+                    control={
+                      <Checkbox
+                        checked={formData.courseIds.includes(Number(c.courseId))}
+                        onChange={() => handleCourseToggle(Number(c.courseId))}
+                        disabled={formData.userType === 'STUDENT' && (!Array.isArray(formData.facultyIds) || formData.facultyIds.length === 0)}
+                      />
+                    }
+                    label={`${c.courseName} (${c.courseCode})`}
+                  />
+                ))}
+              </FormGroup>
+            </Box>
+          )}
+
+          {formData.userType === 'STUDENT' && (
+            <Typography variant="body2" color="text.secondary">
+              Subject teachers are auto-assigned from the selected courses. A student can have multiple teachers.
+            </Typography>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>

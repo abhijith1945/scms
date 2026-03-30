@@ -95,13 +95,25 @@ export default function SubmitAssignment() {
       </Typography>
 
       {success && (
-        <Alert severity="success" sx={{ mb: 2 }}>
+        <Alert
+          severity="success"
+          sx={{
+            mb: 2,
+            '& .MuiAlert-message': { color: '#111827' }
+          }}
+        >
           Assignment submitted successfully! Redirecting...
         </Alert>
       )}
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert
+          severity="error"
+          sx={{
+            mb: 2,
+            '& .MuiAlert-message': { color: '#111827' }
+          }}
+        >
           {error}
         </Alert>
       )}

@@ -84,13 +84,13 @@ export default function AdminDashboard() {
           <Typography variant="h4" sx={{ mb: 1 }}>
             Welcome, {user?.firstName || 'Admin'}!
           </Typography>
-          <Typography variant="body1" color="textSecondary">
+          <Typography variant="body1" sx={{ color: '#f8fafc' }}>
             Manage users, courses, enrollments, and more from here
           </Typography>
         </Box>
 
         <Grid container spacing={3}>
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <Card
               sx={{ cursor: 'pointer', '&:hover': { boxShadow: 4 } }}
               onClick={() => navigate('/admin/users')}
@@ -107,7 +107,7 @@ export default function AdminDashboard() {
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <Card
               sx={{ cursor: 'pointer', '&:hover': { boxShadow: 4 } }}
               onClick={() => navigate('/admin/courses')}
@@ -124,7 +124,7 @@ export default function AdminDashboard() {
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <Card
               sx={{ cursor: 'pointer', '&:hover': { boxShadow: 4 } }}
               onClick={() => navigate('/admin/enrollments')}

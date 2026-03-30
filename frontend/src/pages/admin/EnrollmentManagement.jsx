@@ -122,7 +122,14 @@ export default function EnrollmentManagement() {
             value={selectedCourse}
             onChange={handleCourseChange}
             fullWidth
-            sx={{ maxWidth: 400 }}
+            sx={{
+              maxWidth: 400,
+              color: '#f8fafc',
+              '.MuiSvgIcon-root': { color: '#f8fafc' },
+              '.MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' },
+              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' }
+            }}
           >
             {courses.map(course => (
               <MenuItem key={course.courseId} value={course.courseId}>
@@ -157,11 +164,11 @@ export default function EnrollmentManagement() {
                 </TableRow>
               ) : (
                 enrollments.map(enrollment => (
-                  <TableRow key={enrollment.enrollment_id}>
-                    <TableCell>{enrollment.enrollment_id}</TableCell>
+                  <TableRow key={enrollment.enrollmentId}>
+                    <TableCell>{enrollment.enrollmentId}</TableCell>
                     <TableCell>{enrollment.email}</TableCell>
                     <TableCell>{enrollment.firstName} {enrollment.lastName}</TableCell>
-                    <TableCell>{enrollment.enrollment_no}</TableCell>
+                    <TableCell>{enrollment.enrollmentNo}</TableCell>
                     <TableCell>
                       <Typography sx={{
                         color: enrollment.status === 'ACTIVE' ? '#388e3c' : '#d32f2f',
@@ -173,7 +180,7 @@ export default function EnrollmentManagement() {
                     <TableCell align="center">
                       <IconButton
                         size="small"
-                        onClick={() => handleDelete(enrollment.enrollment_id)}
+                        onClick={() => handleDelete(enrollment.enrollmentId)}
                         color="error"
                       >
                         <DeleteIcon />

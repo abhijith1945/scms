@@ -16,6 +16,8 @@ import {
   DialogContent,
   DialogActions,
   TextField,
+  Select,
+  MenuItem,
   IconButton,
   AppBar,
   Toolbar,
@@ -28,6 +30,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../../context/AuthContext';
 import courseService from '../../services/courseService';
+import api from '../../services/api';
 
 export default function CourseManagement() {
   const [courses, setCourses] = useState([]);
@@ -36,6 +39,7 @@ export default function CourseManagement() {
   const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
+  const [faculty, setFaculty] = useState([]);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -46,12 +50,23 @@ export default function CourseManagement() {
     credits: '',
     semester: '',
     maxCapacity: '',
-    description: ''
+    description: '',
+    facultyId: ''
   });
 
   useEffect(() => {
     fetchCourses();
+    fetchFaculty();
   }, []);
+
+  const fetchFaculty = async () => {
+    try {
+      const response = await api.get('/api/faculty');
+      setFaculty(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      showMessage('Error fetching faculty: ' + error.message, 'error');
+    }
+  };
 
   const fetchCourses = async () => {
     try {
@@ -75,7 +90,8 @@ export default function CourseManagement() {
         credits: courseData.credits,
         semester: courseData.semester,
         maxCapacity: courseData.maxCapacity,
-        description: courseData.description
+        description: courseData.description,
+        facultyId: courseData.facultyId || ''
       });
     } else {
       setEditingId(null);
@@ -86,7 +102,8 @@ export default function CourseManagement() {
         credits: '',
         semester: '',
         maxCapacity: '',
-        description: ''
+        description: '',
+        facultyId: ''
       });
     }
     setOpenDialog(true);
@@ -98,11 +115,16 @@ export default function CourseManagement() {
 
   const handleSave = async () => {
     try {
+      const payload = {
+        ...formData,
+        facultyId: formData.facultyId === '' ? null : Number(formData.facultyId)
+      };
+
       if (editingId) {
-        await courseService.updateCourse(editingId, formData);
+        await courseService.updateCourse(editingId, payload);
         showMessage('Course updated successfully', 'success');
       } else {
-        await courseService.createCourse(formData);
+        await courseService.createCourse(payload);
         showMessage('Course created successfully', 'success');
       }
       handleCloseDialog();
@@ -160,7 +182,13 @@ export default function CourseManagement() {
 
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {message && (
-          <Alert severity={messageType} sx={{ mb: 2 }}>
+          <Alert
+            severity={messageType}
+            sx={{
+              mb: 2,
+              '& .MuiAlert-message': { color: '#111827' }
+            }}
+          >
             {message}
           </Alert>
         )}
@@ -276,6 +304,19 @@ export default function CourseManagement() {
             multiline
             rows={3}
           />
+          <Select
+            name="facultyId"
+            value={formData.facultyId}
+            onChange={handleInputChange}
+            displayEmpty
+          >
+            <MenuItem value="">-- Select Faculty --</MenuItem>
+            {faculty.map((member) => (
+              <MenuItem key={member.userId} value={member.userId}>
+                {member.firstName} {member.lastName}
+              </MenuItem>
+            ))}
+          </Select>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>

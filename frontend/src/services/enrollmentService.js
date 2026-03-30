@@ -13,6 +13,12 @@ const enrollmentService = {
     return response.data;
   },
 
+  // Get current student's enrollments
+  getMyEnrollments: async () => {
+    const response = await api.get('/api/enrollments/me');
+    return response.data;
+  },
+
   // Student enrolls in a course
   enrollCourse: async (courseId) => {
     const response = await api.post('/api/enrollments', { courseId });

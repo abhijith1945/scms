@@ -68,8 +68,9 @@ export default function GradesView() {
   const calculateCourseGrade = (courseId) => {
     const courseSubmissions = submissions.filter(s => s.courseId === courseId && s.marksObtained !== null);
     if (courseSubmissions.length === 0) return null;
-    const totalMarks = courseSubmissions.reduce((sum, s) => sum + s.marks, 0);
-    return (totalMarks / courseSubmissions.length).toFixed(1);
+    const totalMarks = courseSubmissions.reduce((sum, s) => sum + s.marksObtained, 0);
+    const totalMax = courseSubmissions.reduce((sum, s) => sum + (s.maxMarks || 100), 0);
+    return ((totalMarks / totalMax) * 100).toFixed(1);
   };
 
   const getGradeColor = (marks, maxMarks) => {
@@ -83,9 +84,9 @@ export default function GradesView() {
 
   if (loading) return <CircularProgress />;
 
-  const gradedSubmissions = submissions.filter(s => s.marks !== null);
-  const totalObtainedMarks = gradedSubmissions.reduce((sum, s) => sum + s.marks, 0);
-  const totalPossibleMarks = gradedSubmissions.reduce((sum, s) => sum + (s.max_marks || 100), 0);
+  const gradedSubmissions = submissions.filter(s => s.marksObtained !== null);
+  const totalObtainedMarks = gradedSubmissions.reduce((sum, s) => sum + s.marksObtained, 0);
+  const totalPossibleMarks = gradedSubmissions.reduce((sum, s) => sum + (s.maxMarks || 100), 0);
 
   return (
     <Box>
@@ -114,7 +115,7 @@ export default function GradesView() {
                 📊 Overall Performance
               </Typography>
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
                     Total Marks
                   </Typography>
@@ -125,7 +126,7 @@ export default function GradesView() {
                     ({((totalObtainedMarks / totalPossibleMarks) * 100).toFixed(1)}%)
                   </Typography>
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
                     Average Score
                   </Typography>
@@ -154,17 +155,17 @@ export default function GradesView() {
             {enrolledCourses.map(course => {
               const courseGrade = calculateCourseGrade(course.courseId);
               const courseSubmissions = submissions.filter(s => s.courseId === course.courseId);
-              const gradedCount = courseSubmissions.filter(s => s.marks !== null).length;
+              const gradedCount = courseSubmissions.filter(s => s.marksObtained !== null).length;
               
               return (
-                <Grid item xs={12} sm={6} md={4} key={course.courseId}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={course.courseId}>
                   <Card sx={{ '&:hover': { boxShadow: 3 } }}>
                     <CardContent>
                       <Typography variant="subtitle2" color="textSecondary">
                         {course.courseCode}
                       </Typography>
                       <Typography variant="h6" sx={{ mb: 1 }}>
-                        {course.course_name}
+                        {course.courseName}
                       </Typography>
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="body2" color="textSecondary">
@@ -220,24 +221,24 @@ export default function GradesView() {
                 </TableRow>
               ) : (
                 submissions.map(submission => {
-                  const percentage = submission.marks !== null 
-                    ? ((submission.marks / (submission.max_marks || 100)) * 100).toFixed(1)
+                  const percentage = submission.marksObtained !== null 
+                    ? ((submission.marksObtained / (submission.maxMarks || 100)) * 100).toFixed(1)
                     : null;
                   
                   return (
-                    <TableRow key={submission.submission_id}>
+                    <TableRow key={submission.assignmentId}>
                       <TableCell><strong>{submission.courseCode}</strong></TableCell>
-                      <TableCell>{submission.assignment_title}</TableCell>
+                      <TableCell>{submission.title}</TableCell>
                       <TableCell align="center">
-                        {submission.marks !== null ? (
-                          <Typography sx={{ fontWeight: 'bold', color: getGradeColor(submission.marks, submission.max_marks || 100) }}>
-                            {submission.marks}
+                        {submission.marksObtained !== null ? (
+                          <Typography sx={{ fontWeight: 'bold', color: getGradeColor(submission.marksObtained, submission.maxMarks || 100) }}>
+                            {submission.marksObtained}
                           </Typography>
                         ) : (
                           <Typography sx={{ color: '#9ca3af' }}>Pending</Typography>
                         )}
                       </TableCell>
-                      <TableCell align="center">{submission.max_marks || 'N/A'}</TableCell>
+                      <TableCell align="center">{submission.maxMarks || 'N/A'}</TableCell>
                       <TableCell align="center">
                         {percentage ? (
                           <Typography sx={{ fontWeight: 'bold' }}>

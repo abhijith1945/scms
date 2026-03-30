@@ -1,6 +1,6 @@
 const Database = require('better-sqlite3');
 const path = require('path');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 // Create/connect to SQLite database
 const dbPath = path.join(__dirname, process.env.DATABASE_URL || 'scms.db');
@@ -44,7 +44,9 @@ const initDB = () => {
         current_sem INTEGER,
         cgpa DECIMAL(3,2) DEFAULT 0.00,
         parent_id INTEGER,
-        FOREIGN KEY (student_id) REFERENCES users(user_id) ON DELETE CASCADE
+        assigned_faculty_id INTEGER,
+        FOREIGN KEY (student_id) REFERENCES users(user_id) ON DELETE CASCADE,
+        FOREIGN KEY (assigned_faculty_id) REFERENCES faculty(faculty_id) ON DELETE SET NULL
       );
     `);
 
@@ -148,6 +150,19 @@ const initDB = () => {
     `);
 
     console.log('✅ Database schema initialized');
+    
+    // Load seed data if DB is empty
+    const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
+    if (userCount.count === 0) {
+      try {
+        const seedPath = path.join(__dirname, '../database/seeds/data.sql');
+        const seedSQL = require('fs').readFileSync(seedPath, 'utf8');
+        db.exec(seedSQL);
+        console.log('✅ Seed data loaded');
+      } catch (seedErr) {
+        console.error('⚠️ Could not load seed data:', seedErr.message);
+      }
+    }
   } catch (err) {
     console.error('❌ Error initializing database:', err.message);
   }

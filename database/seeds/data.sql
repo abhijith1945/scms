@@ -1,85 +1,88 @@
--- Insert sample users
--- Password for all users: password123 (BCrypt hash)
-INSERT INTO users (email, password_hash, first_name, last_name, phone_number, date_of_birth, gender, address, user_type, is_active) VALUES
-('admin@scms.edu', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Admin', 'User', '9876543210', '1980-01-01', 'Male', 'Admin Office, CET', 'ADMIN', true),
-('faculty1@scms.edu', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Rajesh', 'Kumar', '9876543211', '1985-05-15', 'Male', 'Faculty Quarters, CET', 'FACULTY', true),
-('student1@scms.edu', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Abhijith', 'Unni', '9876543212', '2004-08-20', 'Male', 'Hostel Block A, CET', 'STUDENT', true),
-('student2@scms.edu', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Priya', 'Nair', '9876543213', '2004-11-10', 'Female', 'Hostel Block B, CET', 'STUDENT', true);
+-- Smart Campus Management System - Seed Data
+-- Insert Admin User
+INSERT INTO users (email, password_hash, first_name, last_name, phone_number, date_of_birth, gender, address, user_type, is_active) 
+VALUES ('admin@scms.edu', '$2a$10$xqYh3L0qKJZ0VjZ0k0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z', 'Admin', 'User', '9876543210', '1985-01-01', 'Male', 'CET Trivandrum', 'ADMIN', 1);
 
--- Insert faculty
-INSERT INTO faculty (faculty_id, employee_id, department, designation, specialization, joining_date) VALUES
-(2, 'FAC001', 'Computer Science', 'Assistant Professor', 'Data Structures & Algorithms', '2015-07-01');
+-- Insert Faculty Users
+INSERT INTO users (email, password_hash, first_name, last_name, phone_number, date_of_birth, gender, address, user_type, is_active) 
+VALUES 
+('faculty1@scms.edu', '$2a$10$xqYh3L0qKJZ0VjZ0k0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z', 'Dr. Rajesh', 'Kumar', '9876543211', '1980-05-15', 'Male', 'CET Campus', 'FACULTY', 1),
+('faculty2@scms.edu', '$2a$10$xqYh3L0qKJZ0VjZ0k0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z', 'Dr. Priya', 'Sharma', '9876543212', '1982-08-20', 'Female', 'CET Campus', 'FACULTY', 1);
 
--- Insert students
-INSERT INTO students (student_id, enrollment_no, program, department, enrollment_year, current_sem, cgpa) VALUES
-(3, 'CS2025002', 'B.Tech Computer Science', 'Computer Science', 2025, 4, 8.5),
-(4, 'CS2025074', 'B.Tech Computer Science', 'Computer Science', 2025, 4, 9.2);
+-- Insert Student Users
+INSERT INTO users (email, password_hash, first_name, last_name, phone_number, date_of_birth, gender, address, user_type, is_active) 
+VALUES 
+('student1@scms.edu', '$2a$10$xqYh3L0qKJZ0VjZ0k0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z', 'Abhijith', 'S Unni', '9876543213', '2004-03-10', 'Male', 'Trivandrum', 'STUDENT', 1),
+('student2@scms.edu', '$2a$10$xqYh3L0qKJZ0VjZ0k0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z', 'Arjun', 'Sathyam', '9876543214', '2004-07-22', 'Male', 'Kochi', 'STUDENT', 1);
 
--- Insert courses
-INSERT INTO courses (course_code, course_name, department, credits, semester, max_capacity, description, is_active) VALUES
-('CS401', 'Data Structures', 'Computer Science', 4, 4, 60, 'Introduction to fundamental data structures and algorithms', true),
-('CS402', 'Database Management Systems', 'Computer Science', 4, 4, 60, 'Relational database design and SQL programming', true),
-('CS403', 'Operating Systems', 'Computer Science', 4, 4, 60, 'Process management, memory management, and file systems', true);
+-- Insert Faculty Records
+INSERT INTO faculty (faculty_id, employee_id, department, designation, specialization, joining_date)
+VALUES 
+(2, 'FAC001', 'Computer Science', 'Professor', 'Data Structures', '2010-06-01'),
+(3, 'FAC002', 'Computer Science', 'Assistant Professor', 'Web Development', '2015-07-15');
 
--- Insert enrollments
-INSERT INTO enrollments (student_id, course_id, enrollment_date, status) VALUES
-(3, 1, NOW(), 'ACTIVE'),
-(3, 2, NOW(), 'ACTIVE'),
-(3, 3, NOW(), 'ACTIVE'),
-(4, 1, NOW(), 'ACTIVE'),
-(4, 2, NOW(), 'ACTIVE'),
-(4, 3, NOW(), 'ACTIVE');
+-- Insert Student Records
+INSERT INTO students (student_id, enrollment_no, program, department, enrollment_year, current_sem, cgpa)
+VALUES 
+(4, 'CET2025001', 'B.Tech Computer Science', 'Computer Science', 2025, 4, 8.5),
+(5, 'CET2025002', 'B.Tech Computer Science', 'Computer Science', 2025, 4, 8.2);
 
--- Insert attendance records for student 3 (Abhijith)
-INSERT INTO attendance (student_id, course_id, date, status, marked_by, marked_at) VALUES
--- Data Structures (Course 1) - 70% attendance
-(3, 1, '2026-02-01', 'PRESENT', 2, '2026-02-01 09:00:00'),
-(3, 1, '2026-02-03', 'PRESENT', 2, '2026-02-03 09:00:00'),
-(3, 1, '2026-02-05', 'ABSENT', 2, '2026-02-05 09:00:00'),
-(3, 1, '2026-02-08', 'PRESENT', 2, '2026-02-08 09:00:00'),
-(3, 1, '2026-02-10', 'PRESENT', 2, '2026-02-10 09:00:00'),
-(3, 1, '2026-02-12', 'ABSENT', 2, '2026-02-12 09:00:00'),
-(3, 1, '2026-02-15', 'PRESENT', 2, '2026-02-15 09:00:00'),
-(3, 1, '2026-02-17', 'PRESENT', 2, '2026-02-17 09:00:00'),
-(3, 1, '2026-02-19', 'PRESENT', 2, '2026-02-19 09:00:00'),
-(3, 1, '2026-02-22', 'ABSENT', 2, '2026-02-22 09:00:00'),
--- DBMS (Course 2) - 85% attendance
-(3, 2, '2026-02-02', 'PRESENT', 2, '2026-02-02 10:00:00'),
-(3, 2, '2026-02-04', 'PRESENT', 2, '2026-02-04 10:00:00'),
-(3, 2, '2026-02-06', 'PRESENT', 2, '2026-02-06 10:00:00'),
-(3, 2, '2026-02-09', 'ABSENT', 2, '2026-02-09 10:00:00'),
-(3, 2, '2026-02-11', 'PRESENT', 2, '2026-02-11 10:00:00'),
-(3, 2, '2026-02-13', 'PRESENT', 2, '2026-02-13 10:00:00'),
-(3, 2, '2026-02-16', 'PRESENT', 2, '2026-02-16 10:00:00'),
-(3, 2, '2026-02-18', 'PRESENT', 2, '2026-02-18 10:00:00'),
-(3, 2, '2026-02-20', 'PRESENT', 2, '2026-02-20 10:00:00'),
-(3, 2, '2026-02-23', 'ABSENT', 2, '2026-02-23 10:00:00');
+-- Insert Courses
+INSERT INTO courses (course_code, course_name, department, credits, semester, max_capacity, description, faculty_id, is_active)
+VALUES 
+('CS401', 'Data Structures and Algorithms', 'Computer Science', 4, 4, 60, 'Comprehensive study of data structures including arrays, linked lists, trees, graphs, and algorithms', 2, 1),
+('CS402', 'Database Management Systems', 'Computer Science', 4, 4, 60, 'Introduction to database concepts, SQL, normalization, and transaction management', 2, 1),
+('CS403', 'Web Technologies', 'Computer Science', 3, 4, 60, 'HTML, CSS, JavaScript, React, Node.js and full-stack development', 3, 1);
 
--- Insert attendance for student 4 (Priya)
-INSERT INTO attendance (student_id, course_id, date, status, marked_by, marked_at) VALUES
--- Data Structures - 90% attendance
-(4, 1, '2026-02-01', 'PRESENT', 2, '2026-02-01 09:00:00'),
-(4, 1, '2026-02-03', 'PRESENT', 2, '2026-02-03 09:00:00'),
-(4, 1, '2026-02-05', 'PRESENT', 2, '2026-02-05 09:00:00'),
-(4, 1, '2026-02-08', 'PRESENT', 2, '2026-02-08 09:00:00'),
-(4, 1, '2026-02-10', 'PRESENT', 2, '2026-02-10 09:00:00'),
-(4, 1, '2026-02-12', 'PRESENT', 2, '2026-02-12 09:00:00'),
-(4, 1, '2026-02-15', 'PRESENT', 2, '2026-02-15 09:00:00'),
-(4, 1, '2026-02-17', 'PRESENT', 2, '2026-02-17 09:00:00'),
-(4, 1, '2026-02-19', 'ABSENT', 2, '2026-02-19 09:00:00'),
-(4, 1, '2026-02-22', 'PRESENT', 2, '2026-02-22 09:00:00');
+-- Insert Enrollments
+INSERT INTO enrollments (student_id, course_id, status)
+VALUES 
+(4, 1, 'ACTIVE'),
+(4, 2, 'ACTIVE'),
+(4, 3, 'ACTIVE'),
+(5, 1, 'ACTIVE'),
+(5, 2, 'ACTIVE'),
+(5, 3, 'ACTIVE');
 
--- Insert assignments
-INSERT INTO assignments (course_id, title, description, due_date, max_marks, created_by, created_at) VALUES
-(1, 'Implement Binary Search Tree', 'Create a BST implementation in Java with insert, delete, and search operations', '2026-03-15 23:59:59', 20, 2, NOW()),
-(1, 'Sorting Algorithm Analysis', 'Compare the performance of QuickSort, MergeSort, and HeapSort', '2026-03-22 23:59:59', 15, 2, NOW()),
-(2, 'Design ER Diagram', 'Create an ER diagram for a library management system', '2026-03-18 23:59:59', 25, 2, NOW()),
-(2, 'SQL Query Assignment', 'Write complex SQL queries for the given database schema', '2026-03-25 23:59:59', 20, 2, NOW()),
-(3, 'Process Scheduling Simulation', 'Implement FCFS, SJF, and Round Robin scheduling algorithms', '2026-03-20 23:59:59', 30, 2, NOW());
+-- Insert Assignments for all courses
+INSERT INTO assignments (course_id, title, description, due_date, max_marks, created_by)
+VALUES 
+(1, 'Binary Tree Implementation', 'Implement a binary search tree with insert, delete, and search operations', datetime('now', '+7 days'), 100, 2),
+(1, 'Graph Algorithms', 'Implement Dijkstra and Kruskal algorithms', datetime('now', '+14 days'), 100, 2),
+(2, 'SQL Query Assignment', 'Write complex SQL queries for given scenarios', datetime('now', '+5 days'), 50, 2),
+(2, 'Database Design Project', 'Design and implement a complete database system', datetime('now', '+21 days'), 150, 2),
+(3, 'React Todo App', 'Build a full-featured todo application using React', datetime('now', '+10 days'), 100, 3),
+(3, 'REST API Development', 'Create a RESTful API using Node.js and Express', datetime('now', '+15 days'), 100, 3);
 
--- Insert one sample submission
-INSERT INTO submissions (assignment_id, student_id, file_path, submission_date, marks_obtained, feedback, graded_by, graded_at) VALUES
-(1, 4, '/uploads/assignments/student_4_assignment_1.pdf', '2026-03-10 15:30:00', 18, 'Excellent implementation. Good handling of edge cases.', 2, '2026-03-11 10:00:00');
+-- Insert Sample Submissions
+INSERT INTO submissions (assignment_id, student_id, file_path, marks_obtained, feedback, graded_by, graded_at)
+VALUES 
+(1, 4, 'uploads/assignments/student1_assignment1.pdf', 85.0, 'Good implementation. Consider edge cases.', 2, datetime('now', '-1 day'));
 
--- Print success message
-SELECT 'Database seeded successfully!' as message;
+-- Insert Attendance Records for student 1
+INSERT INTO attendance (student_id, course_id, date, status, marked_by)
+VALUES 
+(4, 1, date('now', '-9 days'), 'PRESENT', 2),
+(4, 1, date('now', '-8 days'), 'PRESENT', 2),
+(4, 1, date('now', '-7 days'), 'ABSENT', 2),
+(4, 1, date('now', '-6 days'), 'PRESENT', 2),
+(4, 1, date('now', '-5 days'), 'PRESENT', 2),
+(4, 1, date('now', '-4 days'), 'LATE', 2),
+(4, 1, date('now', '-3 days'), 'PRESENT', 2),
+(4, 1, date('now', '-2 days'), 'PRESENT', 2),
+(4, 1, date('now', '-1 days'), 'ABSENT', 2),
+(4, 1, date('now'), 'PRESENT', 2);
+
+-- Insert Attendance Records for student 2
+INSERT INTO attendance (student_id, course_id, date, status, marked_by)
+VALUES 
+(5, 1, date('now', '-9 days'), 'PRESENT', 2),
+(5, 1, date('now', '-8 days'), 'PRESENT', 2),
+(5, 1, date('now', '-7 days'), 'PRESENT', 2),
+(5, 1, date('now', '-6 days'), 'PRESENT', 2),
+(5, 1, date('now', '-5 days'), 'ABSENT', 2),
+(5, 1, date('now', '-4 days'), 'PRESENT', 2),
+(5, 1, date('now', '-3 days'), 'PRESENT', 2),
+(5, 1, date('now', '-2 days'), 'PRESENT', 2),
+(5, 1, date('now', '-1 days'), 'PRESENT', 2),
+(5, 1, date('now'), 'PRESENT', 2);

@@ -7,16 +7,25 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const db = require('./db');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 8081;
 const JWT_SECRET = process.env.JWT_SECRET;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(bodyParser.json());
 app.use('/uploads', express.static('uploads'));
+
+// Add a root route
+app.get('/', (req, res) => {
+  res.json({ message: '✅ SCMS Backend is running', version: '1.0.0', endpoints: '/api/*' });
+});
 
 // Create uploads directory
 if (!fs.existsSync('uploads/assignments')) {
@@ -69,6 +78,34 @@ const snakeToCamel = (obj) => {
     converted[camelKey] = value;
   }
   return converted;
+};
+
+const toInt = (value) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const derivePrimaryFacultyFromCourses = (courseIds) => {
+  if (!Array.isArray(courseIds) || courseIds.length === 0) {
+    return null;
+  }
+
+  const getCourseFaculty = db.prepare(`
+    SELECT faculty_id
+    FROM courses
+    WHERE course_id = ? AND faculty_id IS NOT NULL
+  `);
+
+  const facultySet = new Set();
+  courseIds.forEach((courseId) => {
+    const row = getCourseFaculty.get(courseId);
+    if (row?.faculty_id) {
+      facultySet.add(row.faculty_id);
+    }
+  });
+
+  // If all selected courses are handled by one faculty, keep as mentor.
+  return facultySet.size === 1 ? [...facultySet][0] : null;
 };
 
 app.post('/api/auth/login', (req, res) => {
@@ -155,7 +192,26 @@ app.post('/api/auth/register', (req, res) => {
 // GET ALL USERS (Admin only)
 app.get('/api/users', authenticateToken, authorize(['ADMIN']), (req, res) => {
   try {
-    const users = db.prepare('SELECT user_id, email, first_name, last_name, phone_number, date_of_birth, gender, address, user_type, is_active FROM users').all();
+    const users = db.prepare(`
+      SELECT
+        u.user_id,
+        u.email,
+        u.first_name,
+        u.last_name,
+        u.phone_number,
+        u.date_of_birth,
+        u.gender,
+        u.address,
+        u.user_type,
+        u.is_active,
+        s.enrollment_no,
+        s.assigned_faculty_id,
+        f.employee_id
+      FROM users u
+      LEFT JOIN students s ON u.user_id = s.student_id
+      LEFT JOIN faculty f ON u.user_id = f.faculty_id
+      ORDER BY u.user_id DESC
+    `).all();
     res.json(users.map(u => snakeToCamel(u)));
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -166,19 +222,88 @@ app.get('/api/users', authenticateToken, authorize(['ADMIN']), (req, res) => {
 app.get('/api/users/:id', authenticateToken, (req, res) => {
   try {
     const { id } = req.params;
-    const user = db.prepare('SELECT user_id, email, first_name, last_name, phone_number, date_of_birth, gender, address, user_type, is_active FROM users WHERE user_id = ?').get(id);
+    if (req.user.userType !== 'ADMIN' && req.user.userId !== toInt(id)) {
+      return res.status(403).json({ message: 'Cannot access other users' });
+    }
+
+    const user = db.prepare(`
+      SELECT
+        u.user_id,
+        u.email,
+        u.first_name,
+        u.last_name,
+        u.phone_number,
+        u.date_of_birth,
+        u.gender,
+        u.address,
+        u.user_type,
+        u.is_active,
+        s.enrollment_no,
+        s.assigned_faculty_id,
+        f.employee_id
+      FROM users u
+      LEFT JOIN students s ON u.user_id = s.student_id
+      LEFT JOIN faculty f ON u.user_id = f.faculty_id
+      WHERE u.user_id = ?
+    `).get(id);
     
     if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json(snakeToCamel(user));
+
+    let courseIds = [];
+    if (user.user_type === 'STUDENT') {
+      courseIds = db.prepare(`
+        SELECT course_id
+        FROM enrollments
+        WHERE student_id = ? AND status = 'ACTIVE'
+        ORDER BY course_id
+      `).all(id).map((row) => row.course_id);
+    } else if (user.user_type === 'FACULTY') {
+      courseIds = db.prepare(`
+        SELECT course_id
+        FROM courses
+        WHERE faculty_id = ? AND is_active = 1
+        ORDER BY course_id
+      `).all(id).map((row) => row.course_id);
+    }
+
+    let courseFaculties = [];
+    if (user.user_type === 'STUDENT') {
+      courseFaculties = db.prepare(`
+        SELECT DISTINCT f.faculty_id, u.first_name, u.last_name, f.designation
+        FROM enrollments e
+        JOIN courses c ON e.course_id = c.course_id
+        JOIN faculty f ON c.faculty_id = f.faculty_id
+        JOIN users u ON f.faculty_id = u.user_id
+        WHERE e.student_id = ? AND e.status = 'ACTIVE' AND c.faculty_id IS NOT NULL
+        ORDER BY u.first_name, u.last_name
+      `).all(id).map((row) => snakeToCamel(row));
+    }
+
+    res.json({ ...snakeToCamel(user), courseIds, courseFaculties });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
-
+// GET FACULTY LIST
+app.get('/api/faculty', authenticateToken, (req, res) => {
+  try {
+    const faculty = db.prepare(`
+      SELECT u.user_id, u.email, u.first_name, u.last_name, u.phone_number, f.faculty_id, f.employee_id, f.department, f.designation
+      FROM users u
+      JOIN faculty f ON u.user_id = f.faculty_id
+      WHERE u.is_active = 1
+      ORDER BY u.first_name
+    `).all();
+    res.json(faculty.map(f => snakeToCamel(f)));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
 // CREATE USER (Admin only)
 app.post('/api/users', authenticateToken, authorize(['ADMIN']), (req, res) => {
   try {
-    const { email, firstName, lastName, phoneNumber, dateOfBirth, gender, address, userType } = req.body;
+    const { email, firstName, lastName, phoneNumber, dateOfBirth, gender, address, userType, courseIds, facultyId } = req.body;
+    const normalizedCourseIds = Array.isArray(courseIds) ? courseIds.map((id) => toInt(id)).filter((id) => id !== null) : [];
 
     // Check if user exists
     const existing = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
@@ -189,13 +314,52 @@ app.post('/api/users', authenticateToken, authorize(['ADMIN']), (req, res) => {
     // Use default password "password123" hashed
     const passwordHash = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
 
-    const stmt = db.prepare(`
-      INSERT INTO users (email, password_hash, first_name, last_name, phone_number, date_of_birth, gender, address, user_type)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    const insertUserTx = db.transaction(() => {
+      const stmt = db.prepare(`
+        INSERT INTO users (email, password_hash, first_name, last_name, phone_number, date_of_birth, gender, address, user_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
 
-    const result = stmt.run(email, passwordHash, firstName, lastName, phoneNumber, dateOfBirth, gender, address, userType);
-    const newUser = db.prepare('SELECT * FROM users WHERE user_id = ?').get(result.lastInsertRowid);
+      const result = stmt.run(email, passwordHash, firstName, lastName, phoneNumber, dateOfBirth, gender, address, userType);
+      const userId = result.lastInsertRowid;
+
+      if (userType === 'STUDENT') {
+        const enrollNo = `STU${Date.now()}`;
+        const resolvedFacultyId = toInt(facultyId) ?? derivePrimaryFacultyFromCourses(normalizedCourseIds);
+        db.prepare(`
+          INSERT INTO students (student_id, enrollment_no, program, department, enrollment_year, current_sem, cgpa, assigned_faculty_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(userId, enrollNo, 'B.Tech', 'Computer Science', 2025, 4, 0, resolvedFacultyId);
+      } else if (userType === 'FACULTY') {
+        const empId = `FAC${Date.now()}`;
+        db.prepare(`
+          INSERT INTO faculty (faculty_id, employee_id, department, designation, specialization, joining_date)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(userId, empId, 'Computer Science', 'Assistant Professor', 'General', new Date().toISOString().split('T')[0]);
+      }
+
+      if (normalizedCourseIds.length > 0) {
+        if (userType === 'STUDENT') {
+          const enrollStmt = db.prepare(`
+            INSERT OR IGNORE INTO enrollments (student_id, course_id, status)
+            VALUES (?, ?, 'ACTIVE')
+          `);
+          normalizedCourseIds.forEach((courseId) => {
+            enrollStmt.run(userId, courseId);
+          });
+        } else if (userType === 'FACULTY') {
+          const assignStmt = db.prepare('UPDATE courses SET faculty_id = ? WHERE course_id = ?');
+          normalizedCourseIds.forEach((courseId) => {
+            assignStmt.run(userId, courseId);
+          });
+        }
+      }
+
+      return userId;
+    });
+
+    const userId = insertUserTx();
+    const newUser = db.prepare('SELECT * FROM users WHERE user_id = ?').get(userId);
 
     const { password_hash, ...userWithoutPassword } = newUser;
     res.json({ message: 'User created successfully', user: snakeToCamel(userWithoutPassword) });
@@ -208,20 +372,48 @@ app.post('/api/users', authenticateToken, authorize(['ADMIN']), (req, res) => {
 app.put('/api/users/:id', authenticateToken, (req, res) => {
   try {
     const { id } = req.params;
-    const { firstName, lastName, phoneNumber, dateOfBirth, gender, address } = req.body;
+    const { firstName, lastName, phoneNumber, dateOfBirth, gender, address, courseIds, facultyId } = req.body;
+    const normalizedCourseIds = Array.isArray(courseIds) ? courseIds.map((value) => toInt(value)).filter((value) => value !== null) : null;
 
     // Check authorization
     if (req.user.userId !== parseInt(id) && req.user.userType !== 'ADMIN') {
       return res.status(403).json({ message: 'Cannot update other users' });
     }
 
-    const stmt = db.prepare(`
-      UPDATE users 
-      SET first_name = ?, last_name = ?, phone_number = ?, date_of_birth = ?, gender = ?, address = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE user_id = ?
-    `);
+    const updateUserTx = db.transaction(() => {
+      db.prepare(`
+        UPDATE users
+        SET first_name = ?, last_name = ?, phone_number = ?, date_of_birth = ?, gender = ?, address = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ?
+      `).run(firstName, lastName, phoneNumber, dateOfBirth, gender, address, id);
 
-    stmt.run(firstName, lastName, phoneNumber, dateOfBirth, gender, address, id);
+      const user = db.prepare('SELECT user_type FROM users WHERE user_id = ?').get(id);
+
+      if (user && user.user_type === 'STUDENT') {
+        const resolvedFacultyId = toInt(facultyId)
+          ?? (normalizedCourseIds ? derivePrimaryFacultyFromCourses(normalizedCourseIds) : null);
+        db.prepare('UPDATE students SET assigned_faculty_id = ? WHERE student_id = ?').run(resolvedFacultyId, id);
+
+        if (normalizedCourseIds !== null) {
+          db.prepare('DELETE FROM enrollments WHERE student_id = ?').run(id);
+          const enrollStmt = db.prepare('INSERT OR IGNORE INTO enrollments (student_id, course_id, status) VALUES (?, ?, \'ACTIVE\')');
+          normalizedCourseIds.forEach((courseId) => {
+            enrollStmt.run(id, courseId);
+          });
+        }
+      }
+
+      if (user && user.user_type === 'FACULTY' && Array.isArray(normalizedCourseIds)) {
+        db.prepare('UPDATE courses SET faculty_id = NULL WHERE faculty_id = ?').run(id);
+        const assignStmt = db.prepare('UPDATE courses SET faculty_id = ? WHERE course_id = ?');
+        normalizedCourseIds.forEach((courseId) => {
+          assignStmt.run(id, courseId);
+        });
+      }
+    });
+
+    updateUserTx();
+
     const updatedUser = db.prepare('SELECT * FROM users WHERE user_id = ?').get(id);
 
     const { password_hash, ...userWithoutPassword } = updatedUser;
@@ -235,8 +427,20 @@ app.put('/api/users/:id', authenticateToken, (req, res) => {
 app.delete('/api/users/:id', authenticateToken, authorize(['ADMIN']), (req, res) => {
   try {
     const { id } = req.params;
-    
-    db.prepare('DELETE FROM users WHERE user_id = ?').run(id);
+
+    const user = db.prepare('SELECT user_type FROM users WHERE user_id = ?').get(id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const deleteUserTx = db.transaction(() => {
+      if (user.user_type === 'FACULTY') {
+        db.prepare('UPDATE courses SET faculty_id = NULL WHERE faculty_id = ?').run(id);
+      }
+      db.prepare('DELETE FROM users WHERE user_id = ?').run(id);
+    });
+
+    deleteUserTx();
     res.json({ message: 'User deleted successfully' });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -248,7 +452,12 @@ app.delete('/api/users/:id', authenticateToken, authorize(['ADMIN']), (req, res)
 // GET ALL COURSES
 app.get('/api/courses', authenticateToken, (req, res) => {
   try {
-    const courses = db.prepare('SELECT * FROM courses WHERE is_active = 1').all();
+    let courses;
+    if (req.user.userType === 'FACULTY') {
+      courses = db.prepare('SELECT * FROM courses WHERE is_active = 1 AND faculty_id = ?').all(req.user.userId);
+    } else {
+      courses = db.prepare('SELECT * FROM courses WHERE is_active = 1').all();
+    }
     res.json(courses.map(c => snakeToCamel(c)));
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -277,7 +486,17 @@ app.get('/api/courses/:id', authenticateToken, (req, res) => {
     const course = db.prepare('SELECT * FROM courses WHERE course_id = ?').get(id);
     
     if (!course) return res.status(404).json({ message: 'Course not found' });
-    res.json(snakeToCamel(course));
+
+    const enrollments = db.prepare(`
+      SELECT e.enrollment_id, e.student_id, e.status, u.first_name, u.last_name, u.email, s.enrollment_no
+      FROM enrollments e
+      JOIN users u ON e.student_id = u.user_id
+      JOIN students s ON e.student_id = s.student_id
+      WHERE e.course_id = ? AND e.status = 'ACTIVE'
+      ORDER BY u.first_name, u.last_name
+    `).all(id).map(e => snakeToCamel(e));
+
+    res.json({ ...snakeToCamel(course), enrollments });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
@@ -286,15 +505,15 @@ app.get('/api/courses/:id', authenticateToken, (req, res) => {
 // CREATE COURSE (Admin/Faculty)
 app.post('/api/courses', authenticateToken, authorize(['ADMIN', 'FACULTY']), (req, res) => {
   try {
-    const { courseCode, courseName, department, credits, semester, maxCapacity, description } = req.body;
+    const { courseCode, courseName, department, credits, semester, maxCapacity, description, facultyId } = req.body;
 
     const stmt = db.prepare(`
       INSERT INTO courses (course_code, course_name, department, credits, semester, max_capacity, description, faculty_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const facultyId = req.user.userType === 'FACULTY' ? req.user.userId : null;
-    const result = stmt.run(courseCode, courseName, department, credits, semester, maxCapacity, description, facultyId);
+    const resolvedFacultyId = req.user.userType === 'FACULTY' ? req.user.userId : toInt(facultyId);
+    const result = stmt.run(courseCode, courseName, department, credits, semester, maxCapacity, description, resolvedFacultyId);
     const newCourse = db.prepare('SELECT * FROM courses WHERE course_id = ?').get(result.lastInsertRowid);
 
     res.json({ message: 'Course created', course: snakeToCamel(newCourse) });
@@ -311,9 +530,16 @@ app.put('/api/courses/:id', authenticateToken, authorize(['ADMIN', 'FACULTY']), 
 
     // Check if faculty owns the course
     const course = db.prepare('SELECT * FROM courses WHERE course_id = ?').get(id);
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
     if (req.user.userType === 'FACULTY' && course.faculty_id !== req.user.userId) {
       return res.status(403).json({ message: 'Cannot edit course you don\'t own' });
     }
+
+    const resolvedFacultyId = req.user.userType === 'FACULTY'
+      ? req.user.userId
+      : (facultyId === undefined ? course.faculty_id : toInt(facultyId));
 
     const stmt = db.prepare(`
       UPDATE courses 
@@ -321,7 +547,7 @@ app.put('/api/courses/:id', authenticateToken, authorize(['ADMIN', 'FACULTY']), 
       WHERE course_id = ?
     `);
 
-    stmt.run(courseName, department, credits, semester, maxCapacity, description, facultyId, id);
+    stmt.run(courseName, department, credits, semester, maxCapacity, description, resolvedFacultyId, id);
     const updatedCourse = db.prepare('SELECT * FROM courses WHERE course_id = ?').get(id);
 
     res.json({ message: 'Course updated', course: snakeToCamel(updatedCourse) });
@@ -348,6 +574,13 @@ app.get('/api/enrollments/course/:courseId', authenticateToken, authorize(['FACU
   try {
     const { courseId } = req.params;
 
+    if (req.user.userType === 'FACULTY') {
+      const ownedCourse = db.prepare('SELECT course_id FROM courses WHERE course_id = ? AND faculty_id = ?').get(courseId, req.user.userId);
+      if (!ownedCourse) {
+        return res.status(403).json({ message: 'You can only view enrollments for your own courses' });
+      }
+    }
+
     const enrollments = db.prepare(`
       SELECT e.*, u.first_name, u.last_name, u.email, s.enrollment_no
       FROM enrollments e
@@ -362,10 +595,30 @@ app.get('/api/enrollments/course/:courseId', authenticateToken, authorize(['FACU
   }
 });
 
+app.get('/api/enrollments/me', authenticateToken, authorize(['STUDENT']), (req, res) => {
+  try {
+    const enrollments = db.prepare(`
+      SELECT e.*, c.course_code, c.course_name
+      FROM enrollments e
+      JOIN courses c ON e.course_id = c.course_id
+      WHERE e.student_id = ?
+      ORDER BY e.enrollment_date DESC
+    `).all(req.user.userId);
+
+    res.json(enrollments.map((e) => snakeToCamel(e)));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // GET STUDENT'S ENROLLMENTS
 app.get('/api/enrollments/student/:studentId', authenticateToken, (req, res) => {
   try {
     const { studentId } = req.params;
+
+    if (req.user.userType === 'STUDENT' && req.user.userId !== toInt(studentId)) {
+      return res.status(403).json({ message: 'Cannot access other students\' enrollments' });
+    }
     
     const enrollments = db.prepare(`
       SELECT e.*, c.course_name, c.course_code
@@ -433,9 +686,21 @@ app.get('/api/attendance/student/:studentId', authenticateToken, (req, res) => {
     const { studentId } = req.params;
     const { courseId } = req.query;
 
+    if (req.user.userType === 'STUDENT' && req.user.userId !== toInt(studentId)) {
+      return res.status(403).json({ message: 'Cannot access other students\' attendance' });
+    }
+
     let query = `
-      SELECT a.*, c.course_name FROM attendance a
+      SELECT
+        a.*, 
+        c.course_name,
+        c.course_code,
+        u.first_name AS marked_by_first_name,
+        u.last_name AS marked_by_last_name
+      FROM attendance a
       JOIN courses c ON a.course_id = c.course_id
+      LEFT JOIN faculty f ON a.marked_by = f.faculty_id
+      LEFT JOIN users u ON f.faculty_id = u.user_id
       WHERE a.student_id = ?
     `;
     const params = [studentId];
@@ -445,8 +710,16 @@ app.get('/api/attendance/student/:studentId', authenticateToken, (req, res) => {
       params.push(courseId);
     }
 
+    query += ' ORDER BY a.date DESC, a.marked_at DESC';
+
     const attendance = db.prepare(query).all(...params);
-    res.json(attendance.map(a => snakeToCamel(a)));
+    res.json(attendance.map((a) => {
+      const item = snakeToCamel(a);
+      const first = item.markedByFirstName || '';
+      const last = item.markedByLastName || '';
+      item.markedByName = `${first} ${last}`.trim() || 'N/A';
+      return item;
+    }));
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
@@ -455,38 +728,71 @@ app.get('/api/attendance/student/:studentId', authenticateToken, (req, res) => {
 // GET MY ATTENDANCE (Student only)
 app.get('/api/attendance/me', authenticateToken, authorize(['STUDENT']), (req, res) => {
   try {
-    const attendanceRecords = db.prepare(`
-      SELECT a.*, c.course_name FROM attendance a
-      JOIN courses c ON a.course_id = c.course_id
-      WHERE a.student_id = ?
+    const rows = db.prepare(`
+      SELECT
+        c.course_id,
+        c.course_name,
+        c.course_code,
+        COALESCE(SUM(CASE WHEN a.status = 'PRESENT' THEN 1 ELSE 0 END), 0) AS present,
+        COALESCE(SUM(CASE WHEN a.status = 'ABSENT' THEN 1 ELSE 0 END), 0) AS absent,
+        COALESCE(SUM(CASE WHEN a.status = 'LATE' THEN 1 ELSE 0 END), 0) AS late,
+        COUNT(a.attendance_id) AS total
+      FROM enrollments e
+      JOIN courses c ON e.course_id = c.course_id
+      LEFT JOIN attendance a ON a.course_id = c.course_id AND a.student_id = e.student_id
+      WHERE e.student_id = ? AND e.status = 'ACTIVE'
+      GROUP BY c.course_id, c.course_name, c.course_code
+      ORDER BY c.course_code
     `).all(req.user.userId);
 
-    // Calculate percentages by course
     const courseStats = {};
-    attendanceRecords.forEach(record => {
-      if (!courseStats[record.course_id]) {
-        courseStats[record.course_id] = {
-          courseName: record.course_name,
-          present: 0,
-          absent: 0,
-          total: 0
-        };
-      }
-      courseStats[record.course_id].total++;
-      if (record.status === 'PRESENT') {
-        courseStats[record.course_id].present++;
-      } else {
-        courseStats[record.course_id].absent++;
-      }
-    });
-
-    // Calculate percentages
-    Object.keys(courseStats).forEach(courseId => {
-      const stats = courseStats[courseId];
-      stats.percentage = stats.total > 0 ? (stats.present / stats.total) * 100 : 0;
+    rows.forEach((row) => {
+      const key = String(row.course_id);
+      const present = Number(row.present) || 0;
+      const absent = Number(row.absent) || 0;
+      const late = Number(row.late) || 0;
+      const total = Number(row.total) || 0;
+      courseStats[key] = {
+        courseName: row.course_name,
+        courseCode: row.course_code,
+        present,
+        absent,
+        late,
+        total,
+        percentage: total > 0 ? (present / total) * 100 : 0
+      };
     });
 
     res.json(courseStats);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// GET ATTENDANCE FOR COURSE ON DATE (Faculty/Admin)
+app.get('/api/attendance/course/:courseId', authenticateToken, authorize(['FACULTY', 'ADMIN']), (req, res) => {
+  try {
+    const courseId = toInt(req.params.courseId);
+    const date = req.query.date;
+
+    if (!courseId || !date) {
+      return res.status(400).json({ message: 'courseId and date are required' });
+    }
+
+    if (req.user.userType === 'FACULTY') {
+      const ownedCourse = db.prepare('SELECT course_id FROM courses WHERE course_id = ? AND faculty_id = ?').get(courseId, req.user.userId);
+      if (!ownedCourse) {
+        return res.status(403).json({ message: 'You can only view attendance for your own courses' });
+      }
+    }
+
+    const records = db.prepare(`
+      SELECT attendance_id, student_id, course_id, date, status, marked_by
+      FROM attendance
+      WHERE course_id = ? AND date = ?
+    `).all(courseId, date);
+
+    res.json(records.map((record) => snakeToCamel(record)));
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
@@ -497,13 +803,48 @@ app.post('/api/attendance/bulk', authenticateToken, authorize(['FACULTY', 'ADMIN
   try {
     const attendanceList = req.body;
 
+    if (!Array.isArray(attendanceList) || attendanceList.length === 0) {
+      return res.status(400).json({ message: 'No attendance records provided' });
+    }
+
+    const courseId = toInt(attendanceList[0].courseId);
+    if (!courseId) {
+      return res.status(400).json({ message: 'Invalid course selected' });
+    }
+
+    if (req.user.userType === 'FACULTY') {
+      const ownedCourse = db.prepare('SELECT course_id FROM courses WHERE course_id = ? AND faculty_id = ?').get(courseId, req.user.userId);
+      if (!ownedCourse) {
+        return res.status(403).json({ message: 'You can only mark attendance for your own courses' });
+      }
+    }
+
+    const activeEnrollmentCheck = db.prepare(`
+      SELECT enrollment_id
+      FROM enrollments
+      WHERE student_id = ? AND course_id = ? AND status = 'ACTIVE'
+    `);
+
     const stmt = db.prepare(`
       INSERT OR REPLACE INTO attendance (student_id, course_id, date, status, marked_by)
       VALUES (?, ?, ?, ?, ?)
     `);
 
-    attendanceList.forEach(record => {
-      stmt.run(record.studentId, record.courseId, record.date, record.status, req.user.userId);
+    const markedBy = req.user.userType === 'FACULTY' ? req.user.userId : null;
+
+    attendanceList.forEach((record) => {
+      const studentId = toInt(record.studentId);
+      const recordCourseId = toInt(record.courseId);
+      if (!studentId || !recordCourseId || !record.date || !record.status) {
+        throw new Error('Invalid attendance payload');
+      }
+
+      const activeEnrollment = activeEnrollmentCheck.get(studentId, recordCourseId);
+      if (!activeEnrollment) {
+        throw new Error(`Student ${studentId} is not actively enrolled in course ${recordCourseId}`);
+      }
+
+      stmt.run(studentId, recordCourseId, record.date, record.status, markedBy);
     });
 
     res.json({ message: 'Attendance marked successfully', count: attendanceList.length, data: attendanceList.map(a => snakeToCamel(a)) });
@@ -545,6 +886,14 @@ app.delete('/api/attendance/:id', authenticateToken, authorize(['FACULTY', 'ADMI
 app.get('/api/assignments/course/:courseId', authenticateToken, (req, res) => {
   try {
     const { courseId } = req.params;
+
+    if (req.user.userType === 'FACULTY') {
+      const ownedCourse = db.prepare('SELECT course_id FROM courses WHERE course_id = ? AND faculty_id = ?').get(courseId, req.user.userId);
+      if (!ownedCourse) {
+        return res.status(403).json({ message: 'You can only view assignments for your own courses' });
+      }
+    }
+
     const assignments = db.prepare(`
       SELECT a.*, c.course_name FROM assignments a
       JOIN courses c ON a.course_id = c.course_id
@@ -561,7 +910,7 @@ app.get('/api/assignments/course/:courseId', authenticateToken, (req, res) => {
 app.get('/api/assignments/my', authenticateToken, authorize(['STUDENT']), (req, res) => {
   try {
     const assignments = db.prepare(`
-      SELECT a.*, c.course_name FROM assignments a
+      SELECT a.*, c.course_name, c.course_code FROM assignments a
       JOIN courses c ON a.course_id = c.course_id
       JOIN enrollments e ON a.course_id = e.course_id
       WHERE e.student_id = ? AND e.status = 'ACTIVE'
@@ -575,10 +924,21 @@ app.get('/api/assignments/my', authenticateToken, authorize(['STUDENT']), (req, 
       `).get(assignment.assignment_id, req.user.userId);
 
       return {
-        ...snakeToCamel(assignment),
+        assignmentId: assignment.assignment_id,
+        courseId: assignment.course_id,
+        courseCode: assignment.course_code,
+        courseName: assignment.course_name,
+        title: assignment.title,
+        description: assignment.description,
+        dueDate: assignment.due_date,
+        maxMarks: assignment.max_marks,
         submitted: !!submission,
-        submittedAt: submission?.submission_date,
-        marksObtained: submission?.marks_obtained
+        status: submission ? (submission.marks_obtained === null ? 'SUBMITTED' : 'GRADED') : 'PENDING',
+        submissionId: submission?.submission_id || null,
+        submittedAt: submission?.submission_date || null,
+        marksObtained: submission?.marks_obtained ?? null,
+        feedback: submission?.feedback || null,
+        filePath: submission?.file_path || null
       };
     });
 
@@ -610,12 +970,24 @@ app.post('/api/assignments', authenticateToken, authorize(['FACULTY', 'ADMIN']),
   try {
     const { courseId, title, description, dueDate, maxMarks } = req.body;
 
+    if (!courseId || !title || !dueDate || !maxMarks) {
+      return res.status(400).json({ message: 'courseId, title, dueDate, and maxMarks are required' });
+    }
+
+    if (req.user.userType === 'FACULTY') {
+      const ownedCourse = db.prepare('SELECT course_id FROM courses WHERE course_id = ? AND faculty_id = ?').get(courseId, req.user.userId);
+      if (!ownedCourse) {
+        return res.status(403).json({ message: 'You can only create assignments for your own courses' });
+      }
+    }
+
     const stmt = db.prepare(`
       INSERT INTO assignments (course_id, title, description, due_date, max_marks, created_by)
       VALUES (?, ?, ?, ?, ?, ?)
     `);
 
-    const result = stmt.run(courseId, title, description, dueDate, maxMarks, req.user.userId);
+    const createdBy = req.user.userType === 'FACULTY' ? req.user.userId : null;
+    const result = stmt.run(courseId, title, description, dueDate, maxMarks, createdBy);
     const assignment = db.prepare('SELECT * FROM assignments WHERE assignment_id = ?').get(result.lastInsertRowid);
 
     res.json({ message: 'Assignment created', assignment: snakeToCamel(assignment) });
@@ -629,6 +1001,18 @@ app.put('/api/assignments/:id', authenticateToken, authorize(['FACULTY', 'ADMIN'
   try {
     const { id } = req.params;
     const { title, description, dueDate, maxMarks } = req.body;
+
+    const assignment = db.prepare('SELECT * FROM assignments WHERE assignment_id = ?').get(id);
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found' });
+    }
+
+    if (req.user.userType === 'FACULTY') {
+      const ownedCourse = db.prepare('SELECT course_id FROM courses WHERE course_id = ? AND faculty_id = ?').get(assignment.course_id, req.user.userId);
+      if (!ownedCourse) {
+        return res.status(403).json({ message: 'You can only update assignments for your own courses' });
+      }
+    }
 
     const stmt = db.prepare(`
       UPDATE assignments 
@@ -649,6 +1033,19 @@ app.put('/api/assignments/:id', authenticateToken, authorize(['FACULTY', 'ADMIN'
 app.delete('/api/assignments/:id', authenticateToken, authorize(['FACULTY', 'ADMIN']), (req, res) => {
   try {
     const { id } = req.params;
+
+    const assignment = db.prepare('SELECT * FROM assignments WHERE assignment_id = ?').get(id);
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found' });
+    }
+
+    if (req.user.userType === 'FACULTY') {
+      const ownedCourse = db.prepare('SELECT course_id FROM courses WHERE course_id = ? AND faculty_id = ?').get(assignment.course_id, req.user.userId);
+      if (!ownedCourse) {
+        return res.status(403).json({ message: 'You can only delete assignments for your own courses' });
+      }
+    }
+
     db.prepare('DELETE FROM assignments WHERE assignment_id = ?').run(id);
     res.json({ message: 'Assignment deleted' });
   } catch (err) {
@@ -663,15 +1060,43 @@ app.get('/api/assignments/:assignmentId/submissions', authenticateToken, authori
   try {
     const { assignmentId } = req.params;
 
+    if (req.user.userType === 'FACULTY') {
+      const assignment = db.prepare('SELECT a.assignment_id FROM assignments a JOIN courses c ON a.course_id = c.course_id WHERE a.assignment_id = ? AND c.faculty_id = ?').get(assignmentId, req.user.userId);
+      if (!assignment) {
+        return res.status(403).json({ message: 'You can only view submissions for your own courses' });
+      }
+    }
+
     const submissions = db.prepare(`
-      SELECT s.*, u.first_name, u.last_name, u.email, st.enrollment_no
-      FROM submissions s
-      JOIN students st ON s.student_id = st.student_id
-      JOIN users u ON s.student_id = u.user_id
-      WHERE s.assignment_id = ?
+      SELECT
+        e.student_id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        st.enrollment_no,
+        s.submission_id,
+        s.assignment_id,
+        s.file_path,
+        s.submission_date,
+        s.marks_obtained,
+        s.feedback
+      FROM assignments a
+      JOIN enrollments e ON a.course_id = e.course_id AND e.status = 'ACTIVE'
+      JOIN students st ON e.student_id = st.student_id
+      JOIN users u ON e.student_id = u.user_id
+      LEFT JOIN submissions s ON s.assignment_id = a.assignment_id AND s.student_id = e.student_id
+      WHERE a.assignment_id = ?
+      ORDER BY u.first_name, u.last_name
     `).all(assignmentId);
 
-    res.json(submissions.map(s => snakeToCamel(s)));
+    const response = submissions.map((row) => {
+      const item = snakeToCamel(row);
+      item.submitted = !!item.submissionId;
+      item.status = item.submitted ? 'SUBMITTED' : 'NOT_SUBMITTED';
+      return item;
+    });
+
+    res.json(response);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
@@ -684,6 +1109,17 @@ app.post('/api/assignments/:id/submit', authenticateToken, authorize(['STUDENT']
     const file = req.file;
 
     if (!file) return res.status(400).json({ message: 'No file uploaded' });
+
+    const eligibleAssignment = db.prepare(`
+      SELECT a.assignment_id
+      FROM assignments a
+      JOIN enrollments e ON a.course_id = e.course_id
+      WHERE a.assignment_id = ? AND e.student_id = ? AND e.status = 'ACTIVE'
+    `).get(id, req.user.userId);
+
+    if (!eligibleAssignment) {
+      return res.status(403).json({ message: 'You can submit only for assignments in your enrolled courses' });
+    }
 
     // Check if already submitted
     const existing = db.prepare('SELECT * FROM submissions WHERE assignment_id = ? AND student_id = ?').get(id, req.user.userId);
@@ -709,7 +1145,26 @@ app.post('/api/assignments/:id/submit', authenticateToken, authorize(['STUDENT']
 app.put('/api/submissions/:id', authenticateToken, authorize(['FACULTY', 'ADMIN']), (req, res) => {
   try {
     const { id } = req.params;
-    const { marksObtained, feedback } = req.body;
+    const marksObtained = req.body.marksObtained ?? req.body.marks;
+    const feedback = req.body.feedback || null;
+
+    const submission = db.prepare(`
+      SELECT s.submission_id, a.course_id
+      FROM submissions s
+      JOIN assignments a ON s.assignment_id = a.assignment_id
+      WHERE s.submission_id = ?
+    `).get(id);
+
+    if (!submission) {
+      return res.status(404).json({ message: 'Submission not found' });
+    }
+
+    if (req.user.userType === 'FACULTY') {
+      const ownedCourse = db.prepare('SELECT course_id FROM courses WHERE course_id = ? AND faculty_id = ?').get(submission.course_id, req.user.userId);
+      if (!ownedCourse) {
+        return res.status(403).json({ message: 'You can only grade submissions for your own courses' });
+      }
+    }
 
     const stmt = db.prepare(`
       UPDATE submissions 
@@ -717,7 +1172,8 @@ app.put('/api/submissions/:id', authenticateToken, authorize(['FACULTY', 'ADMIN'
       WHERE submission_id = ?
     `);
 
-    stmt.run(marksObtained, feedback, req.user.userId, id);
+    const gradedBy = req.user.userType === 'FACULTY' ? req.user.userId : null;
+    stmt.run(marksObtained, feedback, gradedBy, id);
     const updated = db.prepare('SELECT * FROM submissions WHERE submission_id = ?').get(id);
 
     res.json({ message: 'Submission graded', submission: snakeToCamel(updated) });

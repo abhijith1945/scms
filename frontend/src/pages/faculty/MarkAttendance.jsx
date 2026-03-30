@@ -33,6 +33,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import { useAuth } from '../../context/AuthContext';
 import attendanceService from '../../services/attendanceService';
 import courseService from '../../services/courseService';
+import enrollmentService from '../../services/enrollmentService';
 
 export default function MarkAttendance() {
   const [courses, setCourses] = useState([]);
@@ -42,13 +43,19 @@ export default function MarkAttendance() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchCourses();
   }, []);
+
+  useEffect(() => {
+    if (selectedCourse && selectedDate && enrollments.length > 0) {
+      loadSavedAttendance(selectedCourse, selectedDate, enrollments);
+    }
+  }, [selectedCourse, selectedDate, enrollments]);
 
   const fetchCourses = async () => {
     try {
@@ -68,13 +75,13 @@ export default function MarkAttendance() {
 
   const fetchEnrollments = async (courseId) => {
     try {
-      const data = await courseService.getCourseById(courseId);
-      setEnrollments(data.enrollments || []);
+      const data = await enrollmentService.getCourseEnrollments(courseId);
+      setEnrollments(data || []);
       
       // Initialize attendance data
       const newAttendanceData = {};
-      (data.enrollments || []).forEach(enrollment => {
-        newAttendanceData[enrollment.enrollment_id] = enrollment.status === 'PRESENT';
+      (data || []).forEach(enrollment => {
+        newAttendanceData[enrollment.enrollmentId] = false;
       });
       setAttendanceData(newAttendanceData);
     } catch (error) {
@@ -82,8 +89,27 @@ export default function MarkAttendance() {
     }
   };
 
+  const loadSavedAttendance = async (courseId, date, enrollmentRows) => {
+    try {
+      const savedRecords = await attendanceService.getCourseAttendanceByDate(courseId, date);
+      const attendanceByStudentId = new Map(
+        (savedRecords || []).map((record) => [Number(record.studentId), record.status])
+      );
+
+      const hydratedAttendance = {};
+      (enrollmentRows || []).forEach((enrollment) => {
+        const status = attendanceByStudentId.get(Number(enrollment.studentId));
+        hydratedAttendance[enrollment.enrollmentId] = status === 'PRESENT';
+      });
+
+      setAttendanceData(hydratedAttendance);
+    } catch (error) {
+      showMessage('Error loading saved attendance: ' + error.message, 'error');
+    }
+  };
+
   const handleCourseChange = (e) => {
-    const courseId = e.target.value;
+    const courseId = Number(e.target.value);
     setSelectedCourse(courseId);
     fetchEnrollments(courseId);
   };
@@ -98,7 +124,7 @@ export default function MarkAttendance() {
   const handleMarkAll = () => {
     const newData = {};
     enrollments.forEach(enrollment => {
-      newData[enrollment.enrollment_id] = true;
+      newData[enrollment.enrollmentId] = true;
     });
     setAttendanceData(newData);
   };
@@ -106,7 +132,7 @@ export default function MarkAttendance() {
   const handleUnMarkAll = () => {
     const newData = {};
     enrollments.forEach(enrollment => {
-      newData[enrollment.enrollment_id] = false;
+      newData[enrollment.enrollmentId] = false;
     });
     setAttendanceData(newData);
   };
@@ -114,9 +140,10 @@ export default function MarkAttendance() {
   const handleSaveAttendance = async () => {
     try {
       const attendanceList = enrollments.map(enrollment => ({
-        enrollment_id: enrollment.enrollment_id,
-        attendance_date: selectedDate,
-        status: attendanceData[enrollment.enrollment_id] ? 'PRESENT' : 'ABSENT'
+        studentId: enrollment.studentId,
+        courseId: selectedCourse,
+        date: selectedDate,
+        status: attendanceData[enrollment.enrollmentId] ? 'PRESENT' : 'ABSENT'
       }));
 
       await attendanceService.bulkMarkAttendance(attendanceList);
@@ -157,15 +184,32 @@ export default function MarkAttendance() {
 
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {message && (
-          <Alert severity={messageType} sx={{ mb: 2 }}>
+          <Alert
+            severity={messageType}
+            sx={{
+              mb: 2,
+              '& .MuiAlert-message': { color: '#111827' }
+            }}
+          >
             {message}
           </Alert>
         )}
 
         <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'center' }}>
-          <FormControl sx={{ minWidth: 250 }}>
-            <InputLabel>Course</InputLabel>
-            <Select value={selectedCourse} onChange={handleCourseChange} label="Course">
+            <FormControl
+              sx={{
+                minWidth: 250,
+                '& .MuiInputLabel-root': { color: '#f8fafc' },
+                '& .MuiInputLabel-root.Mui-focused': { color: '#f8fafc' },
+                '& .MuiOutlinedInput-root': { color: '#f8fafc' },
+                '& .MuiSvgIcon-root': { color: '#f8fafc' },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' },
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' },
+                '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' }
+              }}
+            >
+              <InputLabel>Course</InputLabel>
+              <Select value={selectedCourse} onChange={handleCourseChange} label="Course">
               {courses.map(course => (
                 <MenuItem key={course.courseId} value={course.courseId}>
                   {course.courseCode} - {course.courseName}
@@ -181,17 +225,87 @@ export default function MarkAttendance() {
               onChange={(date) => setSelectedDate(date ? date.format('YYYY-MM-DD') : '')}
               disableFuture
               slotProps={{
+                day: {
+                  sx: {
+                    color: '#f8fafc',
+                    '&.Mui-selected': {
+                      backgroundColor: '#2563eb',
+                      color: '#f8fafc'
+                    },
+                    '&.Mui-selected:hover': {
+                      backgroundColor: '#1d4ed8'
+                    }
+                  }
+                },
+                popper: {
+                  sx: {
+                    '& .MuiPaper-root': {
+                      backgroundColor: '#0f172a',
+                      color: '#f8fafc'
+                    },
+                    '& .MuiPickersLayout-root': { color: '#f8fafc' },
+                    '& .MuiPickersLayout-contentWrapper': { color: '#f8fafc' },
+                    '& .MuiPickersCalendarHeader-label': { color: '#f8fafc' },
+                    '& .MuiPickersArrowSwitcher-button': { color: '#f8fafc' },
+                    '& .MuiPickersArrowSwitcher-root button': { color: '#f8fafc' },
+                    '& .MuiDayCalendar-weekDayLabel': { color: '#cbd5e1' },
+                    '& .MuiPickersDay-root': { color: '#f8fafc !important' },
+                    '& .MuiPickersDay-root.Mui-selected': {
+                      backgroundColor: '#2563eb !important',
+                      color: '#f8fafc !important'
+                    }
+                  }
+                },
                 textField: {
-                  sx: { minWidth: 150 }
+                  sx: {
+                    minWidth: 150,
+                    '& .MuiInputLabel-root': { color: '#f8fafc' },
+                    '& .MuiInputLabel-root.Mui-focused': { color: '#f8fafc' },
+                    '& .MuiOutlinedInput-input': { color: '#f8fafc' },
+                    '& .MuiInputBase-input': { color: '#f8fafc !important' },
+                    '& .MuiPickersInputBase-root': {
+                      color: '#f8fafc !important'
+                    },
+                    '& .MuiPickersInputBase-root *': {
+                      color: '#f8fafc !important',
+                      WebkitTextFillColor: '#f8fafc !important'
+                    },
+                    '& .MuiPickersSectionList-root': {
+                      color: '#f8fafc !important'
+                    },
+                    '& .MuiPickersSectionList-section': {
+                      color: '#f8fafc !important',
+                      WebkitTextFillColor: '#f8fafc !important'
+                    },
+                    '& input': {
+                      color: '#f8fafc !important',
+                      WebkitTextFillColor: '#f8fafc !important'
+                    },
+                    '& input::placeholder': {
+                      color: '#f8fafc !important',
+                      opacity: 1
+                    },
+                    '& .MuiInputBase-root': {
+                      color: '#f8fafc !important'
+                    },
+                    '& .MuiSvgIcon-root': { color: '#f8fafc' },
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' },
+                    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f8fafc' }
+                  }
                 }
               }}
             />
           </LocalizationProvider>
         </Box>
 
+        <Typography variant="body2" sx={{ mb: 2, color: '#f8fafc' }}>
+          Selected Date (IST): <strong>{selectedDate}</strong>
+        </Typography>
+
         <Box sx={{ display: 'flex', gap: 2, mb: 3, justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography variant="body2" color="textSecondary">
+            <Typography variant="body2" sx={{ color: '#f8fafc' }}>
               📊 Present: <strong style={{ color: '#388e3c' }}>{presentCount}</strong> | 
               Absent: <strong style={{ color: '#d32f2f' }}>{absentCount}</strong> | 
               Total: <strong>{enrollments.length}</strong>
@@ -235,14 +349,14 @@ export default function MarkAttendance() {
                 </TableRow>
               ) : (
                 enrollments.map(enrollment => (
-                  <TableRow key={enrollment.enrollment_id}>
+                  <TableRow key={enrollment.enrollmentId}>
                     <TableCell align="center">
                       <Checkbox
-                        checked={attendanceData[enrollment.enrollment_id] || false}
-                        onChange={() => handleAttendanceChange(enrollment.enrollment_id)}
+                        checked={attendanceData[enrollment.enrollmentId] || false}
+                        onChange={() => handleAttendanceChange(enrollment.enrollmentId)}
                       />
                     </TableCell>
-                    <TableCell>{enrollment.enrollment_no}</TableCell>
+                    <TableCell>{enrollment.enrollmentNo}</TableCell>
                     <TableCell>
                       {enrollment.firstName} {enrollment.lastName}
                     </TableCell>
